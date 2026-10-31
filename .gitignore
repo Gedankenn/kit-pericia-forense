@@ -1,0 +1,17 @@
+# Saídas de coleta (nunca versionar evidências)
+coleta/
+**/coleta/
+*.log
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# Temporários
+*.tmp
+__pycache__/

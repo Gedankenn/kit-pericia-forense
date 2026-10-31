@@ -1,0 +1,91 @@
+﻿================================================================
+ RESUMO MINIMO DA COLETA  v1.3  (GENERICO)
+ Equip: V13DST   Host: WINLAB-DEMO
+ Local: 2026-10-28 14:06:47 (E. South America Standard Time, offset -03:00:00)
+ UTC:   2026-10-28 17:06:47
+ Usuario: WINLAB-DEMO\perito   Admin: True   Duracao: 202s
+ Destacar (opcional): Corel, Autodesk
+================================================================
+
+--- 1. DESTAQUE (fabricantes de interesse; NAO oculta o restante) ---
+
+ [COREL]
+   Instalado (Uninstall): 1
+     - CorelDRAW Graphics Suite 2020 (TESTE FALSO) | v22.0.0.412 | Maquina 32 bits
+   Indicios (crack/keygen/ativador) ligados: 1
+     - C:\Users\usuario\Downloads\CorelDRAW_2020_keygen.zip
+   Hosts bloqueando dominio: 1
+     - 0.0.0.0 ipm.corel.com
+   Instaladores soltos: 1
+   Arquivos de projeto: 3 (.cdr=3)
+
+ [AUTODESK]
+   Instalado (Uninstall): 1
+     - Autodesk AutoCAD 2020 - English (TESTE FALSO) | v23.1.47.0 | Maquina 64 bits
+       em: C:\Program Files\Autodesk\AutoCAD 2020\
+   Indicios (crack/keygen/ativador) ligados: 1
+     - C:\Users\usuario\Downloads\xf-adsk2020_x64.exe.txt
+   Hosts bloqueando dominio: 2
+     - 127.0.0.1 lm.autodesk.com
+     - 127.0.0.1 register.autodesk.com
+   Arquivos de projeto: 11 (.dwg=5, .dxf=3, .rvt=3)
+
+--- 2. IRREGULARIDADES / INDICIOS DE PIRATARIA (todos os fabricantes) ---
+
+ A) Keygen / crack / patch / ativador (FORTES): 7
+   [Adobe] (2)
+     - C:\Users\usuario\Downloads\Adobe_Photoshop_2024_crack.zip
+     - C:\Users\usuario\Downloads\amtlib.dll.txt
+   [Autodesk] (1)
+     - C:\Users\usuario\Downloads\xf-adsk2020_x64.exe.txt
+   [Corel] (1)
+     - C:\Users\usuario\Downloads\CorelDRAW_2020_keygen.zip
+   [Microsoft] (2)
+     - C:\Users\Public\Downloads\KMSPico_activator.exe.txt
+     - C:\Users\Public\Downloads\Microsoft_Toolkit_KMS.exe.txt
+   [Outro/indefinido] (1)
+     - C:\Users\usuario\Downloads\leia_crack.nfo
+ B) Indicios FRACOS: nenhum
+    (excluidos por -ExclusaoIndicios, ex. ssh-keygen: 2 — ver 11e_)
+ C) Hosts bloqueando ativacao/validacao: 6 linha(s)
+   [Adobe]
+     - L27: 0.0.0.0 lmlicenses.wato.adobe.com
+     - L28: 0.0.0.0 activate.adobe.com
+   [Autodesk]
+     - L23: 127.0.0.1 lm.autodesk.com
+     - L24: 127.0.0.1 register.autodesk.com
+   [Corel]
+     - L25: 0.0.0.0 ipm.corel.com
+   [Microsoft]
+     - L29: 127.0.0.1 kms.microsoft.com
+ D) Servicos de licenca / fabricante: 4
+   - [Outro/indefinido] Client License Service (ClipSVC) | Running | Manual
+   - [Outro/indefinido] FlexNet Licensing Service 64 (TESTE) | Stopped | Manual
+   - [Outro/indefinido] Windows License Manager Service | Running | Manual
+   - [Outro/indefinido] Windows Licensing Monitoring Service | Running | Auto
+ E) Instaladores/pacotes soltos (nome fabricante): 1
+   - [Corel] C:\Users\usuario\Downloads\CorelDRAW_2020_keygen.zip
+ F) Desinstalacoes MSI recentes (produtos dos fabricantes de interesse): 2
+   - 2026-10-22 21:30:04 | Id 11724 | Product: CorelDRAW Graphics Suite 2021 -- Removal completed successfully. (TESTE FALSO)
+   - 2026-10-22 21:30:04 | Id 1034 | Windows Installer removed the product. Product Name: Windows Installer removed the product. Product Name: Auto...
+ G) Binarios de licenciamento sem assinatura valida: 0
+ H) DLLs de sistema em pasta de programa: 0
+ I) Outros discos/particoes/USB ou cobertura parcial: 1
+   - cobertura parcial: disco:C:\ (C:\) [TEMPO_ESGOTADO]
+
+--- 3. SUGESTOES 'vale pesquisar mais neste PC' ---
+ 1. Conferir manualmente os arquivos listados como indicios FORTES (nao executar).
+ 2. hosts alterado com bloqueio de dominio — fotografar e anotar na ata
+ 3. Instaladores soltos presentes — verificar midia/instalacao pendente
+ 4. Houve remocao MSI relevante — checar residuos em Program Files/ProgramData e Lixeira
+
+--- 4. CONTAGENS-CHAVE ---
+ Programas (Uninstall total): 7 | regex coleta (-Fabricantes): 2
+ Arquivos de projeto: 15 | indicios fortes: 7 | fracos: 0 | instaladores: 1
+ Lixeira relevantes: 1 | hosts: 6 | servicos: 4 | remocoes MSI: 2
+ Assinatura invalida/ausente: 0 | DLLs sistema em pasta prog: 0
+ Secoes: OK=13 OK_PARCIAL=0 outras=0 (ver 00_resumo_secoes.csv)
+
+ Pasta da coleta: D:\coleta\V13DST_WINLAB-DEMO_20261028_140325
+ (Somente leitura na maquina vistoriada. Este resumo entra no manifesto SHA-256.)
+================================================================

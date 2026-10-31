@@ -1,0 +1,11 @@
+# Hashes SHA-256 dos arquivos do kit (v1.3 publicada)
+# Conferir no pendrive antes de cada uso:
+#   Get-FileHash .\scripts\coleta_inventario_software_v1.3.ps1 -Algorithm SHA256
+#   certutil -hashfile scripts\coleta_inventario_software_v1.3.ps1 SHA256
+
+f31a6f53f3b950c92e646722c1713d57698d28fc9bf1ee342e838c07e2f321c7  scripts/coleta_inventario_software_v1.3.ps1
+1f1c13b3511f5db469751c201f04dc35cf48ef8ea5333a21745cac20448ae82b  scripts/rodar_coleta_v1.3.cmd
+33dbde2bdac86560d984d6f2d9a8c6bc6355e90f6037972cfd1606075eed8930  scripts/coleta_minima_v1.2.cmd
+fedaf0f1eea4a47bcd57e366ee7029c92f1c5d0d817e98a8fcc274a681224f64  scripts/capturar_tela.cmd
+29254a2d84dfc06da5462c35eb8203cabb05db21189b9f8620bf9854348aa95a  scripts/capturar_tela.ps1
+bd47017a20ea5e7ce62296f6c5da8e9e4e0beeda8db03c664f0ce4d8ded46e8f  docs/KIT_PENDRIVE_v1.3.md
