@@ -32,11 +32,11 @@ Não leve versões antigas (`coleta_inventario_software.ps1`, `_v1.1`, `_v1.2`) 
 - Linha equivalente, se for preciso digitar à mão:
   `powershell -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.3.ps1 -Equip EQ01 -CapturaTela`
 - Opções úteis:
-  - `-Destacar Corel,Autodesk` (**opcional**) — só **destaca** esses fabricantes no topo do `00_RESUMO.txt`. Sem o parâmetro, o resumo é **genérico** (todas as irregularidades de qualquer fabricante). Nunca oculta o restante. Não altera a regex de coleta (`-Fabricantes`).
+  - `-Destacar FabricanteA,FabricanteB` (**opcional**) — só **destaca** esses fabricantes no topo do `00_RESUMO.txt`. Sem o parâmetro, o resumo é **genérico** (todas as irregularidades de qualquer fabricante). Nunca oculta o restante. Não altera a regex de coleta (`-Fabricantes`).
   - `-CopiarLicencas` copia para o pendrive os arquivos de licença de até 5 MB.
   - `-ResolverAtalhos` lê o destino dos `.lnk` recentes.
   - `-MRUCompleto` lista todos os recentes, não só os relacionados.
-  - `-HashArquivosProjeto` calcula o SHA-256 dos .dwg/.cdr. Fica **desligado** por padrão porque ler o conteúdo pode atualizar a "data de último acesso".
+  - `-HashArquivosProjeto` calcula o SHA-256 dos arquivos de projeto (extensões configuráveis). Fica **desligado** por padrão porque ler o conteúdo pode atualizar a "data de último acesso".
 - O script **se recusa** a gravar no disco do sistema (código 2). Para testar no seu PC, use `-ModoTeste`.
 
 ## 3. Passo a passo em cada máquina (5 a 10 min)
@@ -47,7 +47,7 @@ Não leve versões antigas (`coleta_inventario_software.ps1`, `_v1.1`, `_v1.2`) 
 4. Abra o pendrive pelo Explorer. Botão direito em `rodar_coleta_v1.3.cmd` > **Executar como administrador**. A senha de administrador deve ser fornecida pela empresa, e isso deve constar da ata. Sem admin a coleta roda, mas pula Prefetch, Defender e perfis de outros usuários (isso fica registrado em `00_resumo_secoes.csv` e no `00_RESUMO.txt`).
 5. Digite o identificador (EQ01). Aguarde, sem mexer na máquina. Os limites de tempo internos somam em torno de 6 a 9 min no pior caso.
 6. Na tela final: leia o **`00_RESUMO.txt`** (também impresso na tela), **fotografe** o quadro com o resumo e o SHA-256 do manifesto, e anote-os na planilha de campo e na ata.
-7. Para o captura manual da instalação (quando o caso exigir), abra **Configurações > Aplicativos** (ou Painel de Controle > Programas), filtre por "Autodesk" e depois por "Corel", e rode `capturar_tela.cmd EQ01 apps_autodesk`. Evite abrir AutoCAD ou CorelDRAW: isso altera arquivos de perfil e pode disparar validação online. Se for indispensável (tela "Sobre" com o serial), faça por último, registre na ata e capture.
+7. Para a captura manual da instalação (quando o caso exigir), abra **Configurações > Aplicativos** (ou Painel de Controle > Programas), filtre pelo nome do **FabricanteA** e depois do **FabricanteB** do caso, e rode `capturar_tela.cmd EQ01 apps_fabricanteA`. Evite abrir o aplicativo em análise: isso altera arquivos de perfil e pode disparar validação online. Se for indispensável (tela "Sobre" com o serial), faça por último, registre na ata e capture.
 8. Feche a janela e use "Ejetar" no pendrive. Anote o horário de término.
 9. Se o PowerShell estiver bloqueado (mensagem de política, AppLocker ou "modo de linguagem restrito" no log), use `coleta_minima_v1.2.cmd` (plano B, menos completo; **não** gera o `00_RESUMO.txt`).
 
@@ -63,7 +63,7 @@ Não leve versões antigas (`coleta_inventario_software.ps1`, `_v1.1`, `_v1.2`) 
 | 06 / 06b / 09c | serviços, processos e portas de licenciamento (servidor de rede FlexLM) |
 | 08 / 08b / 09 / 09b | hosts (cópia integral e linhas que bloqueiam domínios dos fabricantes de interesse) e regras de firewall  |
 | 11 / 11b / 11c / 11d / 11e | nomes de crack/keygen, instaladores, DLLs "loader", assinatura digital, indícios excluídos (ssh-keygen)  |
-| 10 / 10b / 10c | arquivos .dwg/.dxf/.rvt/.cdr etc. (só metadados), contagem e cobertura de cada varredura  |
+| 10 / 10b / 10c | arquivos de projeto pelas extensões configuradas (só metadados), contagem e cobertura de cada varredura  |
 | 12* / 13 / 14 / 18 | eventos de instalação e remoção MSI, limpeza de logs, Prefetch, Lixeira, pastas remanescentes  |
 | 15 / 16 / 17* | atalhos recentes, MRU, Defender |
 
@@ -98,7 +98,7 @@ Nenhum arquivo de usuário é aberto, alterado ou apagado. A coleta do Prefetch 
   - [ ] que nenhuma seção ficou em `ERRO` inesperado (o log `00_log_execucao.txt` traz a causa);
   - [ ] que os CSVs abrem no Excel com acentos corretos;
   - [ ] que o antivírus (Defender) não alertou;
-  - [ ] o teste com uma pasta `Documentos\teste\x.dwg` e um arquivo `keygen_teste.txt`: precisam aparecer em `10_` e `11_` e no resumo.
+  - [ ] o teste com uma pasta `Documentos\teste\x.proj` e um arquivo `keygen_teste.txt`: precisam aparecer em `10_` e `11_` e no resumo.
 - [ ] Testar também `capturar_tela.cmd` e, se possível, `coleta_minima_v1.2.cmd`.
 - [ ] Apagar a pasta `coleta\` de teste do pendrive.
 - [ ] Gerar os hashes do kit e salvar em `KIT_SHA256.txt`. Imprimir e levar uma cópia em papel para a ata.

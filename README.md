@@ -21,7 +21,7 @@ Script de perícia / vistoria de software que monta, em minutos, um pacote de ev
 - programas instalados (registro Uninstall 64/32 bits + HKCU/HKU);
 - indícios por nome (keygen, crack, KMS, patch, ativador…);
 - hosts e firewall que bloqueiam ativação;
-- metadados de arquivos de projeto (`.dwg`, `.cdr`, `.rvt`…);
+- metadados de arquivos de projeto (extensões configuráveis);
 - Prefetch, eventos MSI, Lixeira, Defender (quando há admin);
 - **`00_RESUMO.txt`** — veredito curto em português, impresso na tela e coberto pelo manifesto.
 
@@ -58,7 +58,7 @@ Não substitui imagem forense (FTK/E01). É o kit leve de **campo**, para ler na
 | Programas | Uninstall completo + filtro por fabricantes (`-Fabricantes`) |
 | Licença | chaves de registro, FlexLM, arquivos de licença (+ SHA-256) |
 | Indícios | keygen/crack/KMS, hosts, firewall, assinatura digital |
-| Projetos | metadados `.dwg` / `.cdr` / `.rvt`… com timeout por raiz |
+| Projetos | metadados de arquivos de projeto (extensões configuráveis) com timeout por raiz |
 | Histórico | MSI install/remove, Prefetch, Lixeira, Defender |
 
 Detalhamento completo: [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md).
@@ -122,7 +122,7 @@ Por padrão o resumo é **genérico**: irregularidades de qualquer fabricante.
 
 ```powershell
 # só prioriza no topo; NUNCA oculta o restante
-... -Destacar Corel,Autodesk
+... -Destacar FabricanteA,FabricanteB
 ```
 
 - Não altera a regex de coleta (`-Fabricantes`).

@@ -26,7 +26,7 @@
     -CopiarLicencas        copia para o pendrive os arquivos de licenca pequenos (<= 5 MB)
     -ResolverAtalhos       le o destino dos atalhos .lnk da pasta Recent (abre o .lnk para leitura)
     -MRUCompleto           lista TODOS os itens recentes (padrao: so os relacionados ao objeto da pericia)
-    -Destacar              (opcional) fabricantes/produtos a DESTACAR no topo do resumo (ex.: Corel,Autodesk).
+    -Destacar              (opcional) fabricantes/produtos a DESTACAR no topo do resumo (ex.: FabricanteA,FabricanteB).
                            Padrao vazio = relatorio generico completo, sem destaque. Nunca oculta o resto.
     -ModoTeste             permite gravar no disco do sistema (SO PARA TESTE NO PC DO PERITO)
 
@@ -96,7 +96,7 @@ $ErrorActionPreference = 'SilentlyContinue'   # erros sao contados e registrados
 $env:PSModuleAnalysisCachePath = 'NUL'         # nao gravar cache de modulos no perfil da maquina vistoriada (v1.1 testes em VM)
 $ProgressPreference    = 'SilentlyContinue'
 $VersaoScript = '1.3'
-# -Destacar opcional: Corel,Autodesk ou varios -Destacar Corel -Destacar Autodesk. Vazio = generico.
+# -Destacar opcional: FabricanteA,FabricanteB ou varios -Destacar FabricanteA -Destacar FabricanteB. Vazio = generico.
 if ($null -eq $Destacar) { $Destacar = @() }
 elseif ($Destacar.Count -eq 1 -and ([string]$Destacar[0]) -match '[,;]') {
   $Destacar = @(([string]$Destacar[0] -split '[,;]+') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
@@ -666,7 +666,7 @@ Invoke-Secao 'MRU do registro (usuarios com hive carregado)' {
       }
       $os2.Close()
     }
-    # 3) MRU dos produtos Autodesk / Corel (chaves com Recent/MRU/History)
+    # 3) MRU dos produtos dos fabricantes de interesse (chaves com Recent/MRU/History)
     foreach ($fab in 'Autodesk', 'Corel', 'Alludo') {
       $tmp = New-Object System.Collections.ArrayList
       $res = Read-RegTree -Base $script:HKU -Path "$sid\Software\$fab" -Rotulo 'HKU' -RxNome $null -RxChave $rxMru -MaxProf 10 -Segundos 30 -MaxLinhas 10000 -Saida $tmp
@@ -702,7 +702,7 @@ Invoke-Secao 'MRU do registro (usuarios com hive carregado)' {
       $off.Close()
     }
   }
-  Save-Csv '16_mru_registro.csv' $lin 'Listas de recentes no registro (RecentDocs, Abrir/Salvar, Autodesk/Corel, Office filtrado)'
+  Save-Csv '16_mru_registro.csv' $lin 'Listas de recentes no registro (RecentDocs, Abrir/Salvar, fabricantes de interesse, Office filtrado)'
 }
 
 Invoke-Secao 'Programas instalados (Uninstall 64/32 bits + HKEY_USERS)' {
@@ -739,7 +739,7 @@ Invoke-Secao 'Programas instalados (Uninstall 64/32 bits + HKEY_USERS)' {
   $naoCarregados = @($script:Perfis | Where-Object { -not $_.HiveCarregado } | ForEach-Object { $_.Usuario })
   if ($naoCarregados.Count -gt 0) { Write-Registro ("  Perfis sem hive carregado (programas instalados 'so para o usuario' NAO lidos): " + ($naoCarregados -join ', ')) 'AVISO' }
   Save-Csv '03_programas_todos.csv' ($script:Programas | Sort-Object DisplayName) 'Todos os programas (registro Uninstall)'
-  Save-Csv '04_programas_fabricantes.csv' ($script:Programas | Where-Object { $script:RxFab.IsMatch($_.DisplayName) -or $script:RxFab.IsMatch($_.Publisher) } | Sort-Object DisplayName) 'Programas dos fabricantes de interesse (Autodesk / Corel-Alludo-Parallels)'
+  Save-Csv '04_programas_fabricantes.csv' ($script:Programas | Where-Object { $script:RxFab.IsMatch($_.DisplayName) -or $script:RxFab.IsMatch($_.Publisher) } | Sort-Object DisplayName) 'Programas dos fabricantes de interesse (-Fabricantes)'
 }
 
 Invoke-Secao 'Registro dos fabricantes: licenca/serial/produto' {
@@ -1230,7 +1230,7 @@ function Write-ResumoMinimo {
     [void]$linhas.Add('')
   } else {
     [void]$linhas.Add('--- 1. DESTAQUE ---')
-    [void]$linhas.Add(' (omitido — rode com -Destacar Corel,Autodesk se quiser priorizar fabricantes no topo)')
+    [void]$linhas.Add(' (omitido — rode com -Destacar FabricanteA,FabricanteB se quiser priorizar fabricantes no topo)')
     [void]$linhas.Add('')
   }
 

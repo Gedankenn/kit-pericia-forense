@@ -6,6 +6,6 @@ if exist "%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe" set "PSE
 set "EQ=%~1"
 if "%EQ%"=="" set /p "EQ=Equipamento (ex.: EQ01): "
 set "DS=%~2"
-if "%DS%"=="" set /p "DS=Descricao curta (ex.: apps_autodesk): "
+if "%DS%"=="" set /p "DS=Descricao curta (ex.: apps_fabricanteA): "
 "%PSEXE%" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0capturar_tela.ps1" -Equip "%EQ%" -Descricao "%DS%"
 pause
