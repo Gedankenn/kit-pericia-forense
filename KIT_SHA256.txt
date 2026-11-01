@@ -1,11 +1,20 @@
-# Hashes SHA-256 dos arquivos do kit (v1.3 publicada)
-# Conferir no pendrive antes de cada uso:
-#   Get-FileHash .\scripts\coleta_inventario_software_v1.3.ps1 -Algorithm SHA256
-#   certutil -hashfile scripts\coleta_inventario_software_v1.3.ps1 SHA256
+# Hashes SHA-256 do kit (verificar antes de cada diligência)
+# Formato: <hash>  <arquivo>
 
+# --- v1.3 ---
 83e04ecbe2fe573c64d0c84d9dcdac5d00ae11ebbaf3c95c627d468637c75df7  scripts/coleta_inventario_software_v1.3.ps1
 1f1c13b3511f5db469751c201f04dc35cf48ef8ea5333a21745cac20448ae82b  scripts/rodar_coleta_v1.3.cmd
+47792d73d6ff5248dd3b75d733f1d793316da5534dc46be342062047a57d2e0b  docs/KIT_PENDRIVE_v1.3.md
+
+# --- v1.4 2026-11-01 America/Sao_Paulo ---
+9827c12e130f18679a8230916c81277dcc46c5493e87707a377b0943881475f4  scripts/coleta_inventario_software_v1.4.ps1
+4d0810f39bb3e1a0b6398cdb95ceddeade8fcd06de4757ea5887d845e6e73b17  scripts/rodar_coleta_v1.4.cmd
+66d91a1dc10c3013ae5da2253973477475e697077bbd46bf1ba6b3fe1a92c1f4  docs/KIT_PENDRIVE_v1.4.md
+da93724f58b9d5ecbb19bc3e2495fb6cfd6f32499f441880b77a609e0b61fed5  docs/CHECKLIST_CAMPO_v1.4.md
+da5e2a90d0d31d12794ba3c9eb4cf575e38295a887525dccccfd4d7b4d698abf  docs/PLANO_v1.4.md
+3bc897b0cfb357eb09d2dc2f9767c96d72a8fe0d5b07ce207b63cbfc590bfdec  perfis/exemplo_generico.psd1
+
+# Auxiliares (sem mudança na v1.4)
 33dbde2bdac86560d984d6f2d9a8c6bc6355e90f6037972cfd1606075eed8930  scripts/coleta_minima_v1.2.cmd
 b86679eda1aeabf290d4437d5dd66c7b3607e3a09b3247d877a21edc1e6a8a71  scripts/capturar_tela.cmd
 29254a2d84dfc06da5462c35eb8203cabb05db21189b9f8620bf9854348aa95a  scripts/capturar_tela.ps1
-47792d73d6ff5248dd3b75d733f1d793316da5534dc46be342062047a57d2e0b  docs/KIT_PENDRIVE_v1.3.md

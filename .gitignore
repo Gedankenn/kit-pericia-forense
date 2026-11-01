@@ -15,3 +15,10 @@ Desktop.ini
 # Temporários
 *.tmp
 __pycache__/
+
+# Nunca versionar perfis de casos reais nem saídas de coleta
+perfis/caso_*.psd1
+perfis/caso_*.json
+**/coleta/
+**/hives_offline/
+**/suspeitos_copias/

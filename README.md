@@ -6,9 +6,9 @@
 
 **Coleta forense somente-leitura** de inventário de software em Windows. Feito para vistoria em campo: roda do pendrive, não grava no disco vistoriado, imprime um resumo na tela e fecha com manifesto SHA-256.
 
-> PowerShell 5.1 nativo · saída só no pendrive · `00_RESUMO.txt` genérico · parâmetro opcional `-Destacar`
+> PowerShell 5.1 nativo · saída só no pendrive · `00_RESUMO.txt` genérico · `-Perfil` · hives offline · fallback Defender
 
-[![versão](https://img.shields.io/badge/versão-1.3-f5a623?style=flat-square)](#)
+[![versão](https://img.shields.io/badge/versão-1.4-f5a623?style=flat-square)](#)
 [![somente%20leitura](https://img.shields.io/badge/disco%20vistoriado-READ--ONLY-2ecc71?style=flat-square)](#garantias-somente-leitura)
 [![licença](https://img.shields.io/badge/licença-MIT-blue?style=flat-square)](LICENSE)
 
@@ -41,7 +41,7 @@ Não substitui imagem forense (FTK/E01). É o kit leve de **campo**, para ler na
 | Política de execução intacta | `-ExecutionPolicy Bypass -File` só naquela sessão |
 | Sem cache de módulo no perfil | `PSModuleAnalysisCachePath=NUL` |
 | Sem `Win32_Product` | Inventário via registro .NET (read-only) — não dispara repair MSI |
-| Sem carregar hive deslogado | Evita alterar `NTUSER.DAT` |
+| Hive deslogado (v1.4) | Cópia de `NTUSER.DAT` no **pendrive** + `reg load` só da cópia (`-LerHivesOffline`) |
 | Sem compilar C# | Nada em `%TEMP%` via `Add-Type` |
 | Resumo no manifesto | `00_RESUMO.txt` é escrito **antes** do SHA-256 |
 
@@ -61,7 +61,7 @@ Não substitui imagem forense (FTK/E01). É o kit leve de **campo**, para ler na
 | Projetos | metadados de arquivos de projeto (extensões configuráveis) com timeout por raiz |
 | Histórico | MSI install/remove, Prefetch, Lixeira, Defender |
 
-Detalhamento completo: [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md).
+Detalhamento completo: [`docs/KIT_PENDRIVE_v1.4.md`](docs/KIT_PENDRIVE_v1.4.md).
 
 ---
 
@@ -69,21 +69,23 @@ Detalhamento completo: [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md).
 
 ```
 E:\                                      (NTFS ou exFAT, ≥ 16 GB)
-├── rodar_coleta_v1.3.cmd                ← botão direito → Executar como administrador
-├── coleta_inventario_software_v1.3.ps1
+├── rodar_coleta_v1.4.cmd                ← botão direito → Executar como administrador
+├── coleta_inventario_software_v1.4.ps1
+├── perfis\exemplo_generico.psd1        ← listas externas (-Perfil)
 ├── coleta_minima_v1.2.cmd               ← plano B (PowerShell bloqueado)
 ├── capturar_tela.cmd / .ps1
 ├── KIT_SHA256.txt
 └── coleta\                              ← criada na hora
     └── EQ01_<HOST>_<data_hora>\
         ├── 00_RESUMO.txt
+        ├── hives_offline\ / suspeitos_copias\
         ├── *.csv / *.txt
         └── MANIFESTO_SHA256.txt
 ```
 
 1. Foto do equipamento + etiqueta `EQ01` + relógio do Windows vs. referência.
 2. Plugar o pendrive (**recusar** “verificar e corrigir”).
-3. Botão direito em `rodar_coleta_v1.3.cmd` → **Executar como administrador**.
+3. Botão direito em `rodar_coleta_v1.4.cmd` → **Executar como administrador**.
 4. Digitar o identificador (`EQ01`). Esperar ~3–10 min.
 5. Ler / fotografar o `00_RESUMO.txt` e o hash do manifesto.
 6. Ejetar com segurança.
@@ -91,13 +93,13 @@ E:\                                      (NTFS ou exFAT, ≥ 16 GB)
 Equivalente manual:
 
 ```bat
-powershell -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.3.ps1 -Equip EQ01 -CapturaTela
+powershell -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.ps1 -Equip EQ01 -CapturaTela -Perfil E:\perfis\exemplo_generico.psd1
 ```
 
 Teste no seu PC (permite gravar em `C:\`):
 
 ```bat
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\coleta_inventario_software_v1.3.ps1 -Equip TESTE -ModoTeste
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\coleta_inventario_software_v1.4.ps1 -Equip TESTE -ModoTeste
 ```
 
 ---
@@ -108,8 +110,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\coleta_inventario_
 |---|---|---|
 | Uninstall HKLM + HKCU | ✓ | ✓ (HKCU do usuário atual) |
 | Prefetch | ✓ | pulado |
-| Defender (ameaças / exclusões) | ✓ | pulado |
-| Perfis de outros usuários | parcial (arquivos); hive só se logado | só o próprio |
+| Defender (ameaças / exclusões) | ✓ (cmdlets ou fallback registro) | eventos; exclusões via registro se admin |
+| Hives offline (v1.4) | ✓ (cópia no pendrive) | desligado |
+| Perfis de outros usuários | arquivos + Uninstall/MRU via hive offline | só o próprio |
 | Registro no log | seções `OK` | seções `PULADA` / aviso no resumo |
 
 **Recomendação:** sempre “Executar como administrador”. Sem admin a coleta **roda**, mas a cobertura fica parcial — e isso fica escrito no `00_RESUMO.txt` e em `00_resumo_secoes.csv`.
@@ -151,7 +154,7 @@ Verificação do kit (antes de sair): [`docs/INTEGRIDADE.md`](docs/INTEGRIDADE.m
 
 ## Uso em campo (perícia judicial)
 
-Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em campo rodou a **v1.2** do script (SHA conferido com o `KIT_SHA256` do pendrive). Este repositório publica a **v1.3** (mesmo núcleo de coleta + `00_RESUMO.txt` genérico e `-Destacar`).
+Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em campo rodou a **v1.2** (SHA conferido com o `KIT_SHA256` do pendrive). Este repositório publica a **v1.4**, que incorpora as correções sugeridas após o campo.
 
 | | Em campo |
 |---|---|
@@ -172,7 +175,7 @@ Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em
 - verificação do arquivo `hosts` (sem bloqueios aos fabricantes nas 9);
 - falsos positivos do matcher (texturas com “crack” no nome, `crackfortran` do numpy, PDFs etc.).
 
-**Problemas observados**
+**Problemas observados no campo (v1.2)** — endereçados na v1.4 (tabela abaixo)
 
 1. Cmdlets do Defender falharam (`0x800106ba`) em **6 de 9** máquinas — restaram eventos `5007`.
 2. Perfis com hive **não** carregado: programas “só para o usuário” e MRU desses perfis não foram lidos.
@@ -180,17 +183,19 @@ Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em
 4. O kit **não** hasheia automaticamente binários de licenciamento suspeitos.
 5. Checklist de campo sem capturas manuais de “Sobre” e de Programas e Recursos.
 
-**Roadmap**
+**Corrigido / melhorado na v1.4**
 
-- Carregar hive de usuário deslogado (ou documentar workaround).
-- Fallback quando os cmdlets do Defender falham.
-- Hash + verificação de assinatura automáticos de binários de licenciamento.
-- Reduzir falsos positivos do matcher crack/keygen.
-- Teste ponta a ponta como usuário comum (console físico).
-- Validar relaunch 32→64, AppLocker, PCs lentos e AV corporativo agressivo.
-- Incluir capturas manuais (“Sobre”, Programas e Recursos) no checklist de campo.
+| Problema de campo | v1.4 |
+|---|---|
+| Hive deslogado não lido | `-LerHivesOffline`: cópia no pendrive + `reg load` da cópia |
+| Defender `0x800106ba` | fallback: exclusões/status via registro (`17c_` / `17d_`) |
+| Sem hash de suspeitos | SHA-256 + Authenticode em `11d_`; `-CopiarSuspeitos` |
+| Falsos positivos crack/keygen | `11f_indicios_provavel_fp.csv` (imagens, PDF, site-packages, crackfortran…) |
+| IDs `EQ1` vs `EQ01` | normalização automática para `EQ##` |
+| Listas no script | `-Perfil` (`.psd1`/`.json`); exemplo em `perfis/` |
+| Capturas manuais | checklist no `00_RESUMO` + [`docs/CHECKLIST_CAMPO_v1.4.md`](docs/CHECKLIST_CAMPO_v1.4.md) |
 
-Ainda valem: hive deslogado não carregado (decisão técnica); data de última gravação de chave de registro não coletada; captura de tela parcial em DPI alto / multi-monitor; plano B (`coleta_minima_v1.2.cmd`) **não** gera `00_RESUMO.txt`. Checklist pré-voo continua obrigatório — ver [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md).
+**Ainda em aberto:** teste ponta a ponta como usuário comum no console físico; AppLocker / relaunch 32→64 em ambiente restrito; PCs lentos + AV corporativo agressivo; data de última gravação de chave de registro; plano B sem `00_RESUMO`. Guia: [`docs/KIT_PENDRIVE_v1.4.md`](docs/KIT_PENDRIVE_v1.4.md).
 
 ---
 
@@ -200,24 +205,25 @@ Ainda valem: hive deslogado não carregado (decisão técnica); data de última 
 kit-pericia-forense/
 ├── README.md
 ├── LICENSE                          MIT
-├── KIT_SHA256.txt                   hashes dos scripts/docs
+├── KIT_SHA256.txt
 ├── .gitignore
 ├── scripts/
-│   ├── coleta_inventario_software_v1.3.ps1
+│   ├── coleta_inventario_software_v1.4.ps1   ← atual
+│   ├── rodar_coleta_v1.4.cmd
+│   ├── coleta_inventario_software_v1.3.ps1   (histórico)
 │   ├── rodar_coleta_v1.3.cmd
 │   ├── coleta_minima_v1.2.cmd
-│   ├── capturar_tela.cmd
-│   └── capturar_tela.ps1
+│   └── capturar_tela.*
+├── perfis/
+│   └── exemplo_generico.psd1
 ├── docs/
-│   ├── KIT_PENDRIVE_v1.3.md         guia de campo
+│   ├── KIT_PENDRIVE_v1.4.md
+│   ├── CHECKLIST_CAMPO_v1.4.md
+│   ├── PLANO_v1.4.md
+│   ├── KIT_PENDRIVE_v1.3.md
 │   └── INTEGRIDADE.md
-├── exemplos/
-│   ├── exemplo_00_RESUMO_v1.3.txt
-│   └── exemplo_00_RESUMO_v1.3_sem_destacar.txt
-└── img/
-    ├── banner.jpg
-    ├── fluxo_coleta.png
-    └── exemplo_00_RESUMO_v1.3.png
+├── exemplos/ …
+└── img/ …
 ```
 
 ---
