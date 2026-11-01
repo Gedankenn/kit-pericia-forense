@@ -149,15 +149,48 @@ Verificação do kit (antes de sair): [`docs/INTEGRIDADE.md`](docs/INTEGRIDADE.m
 
 ---
 
-## Limitações / não testado
+## Uso em campo (perícia judicial)
 
-- Hive de usuário **deslogado** não é carregado (decisão técnica).
-- Data de última gravação de chave de registro não é coletada.
-- Captura de tela pode ficar parcial em DPI alto / multi-monitor.
-- Seriais Autodesk recentes em geral **não** ficam no registro.
-- Plano B (`coleta_minima_v1.2.cmd`) **não** gera `00_RESUMO.txt`.
-- **Não testado de ponta a ponta:** usuário padrão no console físico (sem SSH); relaunch 32→64 bits em AppLocker restrito; tempo em PC real lento / antivírus corporativo agressivo.
-- Testado em VM Windows 10 (PowerShell 5.1) com artefatos plantados. Checklist pré-voo em PC real continua obrigatório (ver doc do pendrive).
+Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em campo rodou a **v1.2** do script (SHA conferido com o `KIT_SHA256` do pendrive). Este repositório publica a **v1.3** (mesmo núcleo de coleta + `00_RESUMO.txt` genérico e `-Destacar`).
+
+| | Em campo |
+|---|---|
+| Hosts | 9 PCs Windows (7 Win10 Pro, 2 Win11 Pro), domínio e workgroup |
+| Ambiente | PowerShell 5.1, 64 bits; **todas** as coletas como Administrador |
+| Tempo | média ~67 s / PC (mín. 27 s, máx. 163 s); nenhuma estourou o limite de 240 s |
+| Inventário | 527 softwares no total · média ~59 / PC (28–107) |
+| Integridade | manifesto SHA-256 com **0 falhas** nas 9; hash do manifesto bateu com `.sha256` e com o índice geral |
+| Saída | gravada **só** no pendrive |
+
+**Tipos de achados** (genéricos; em algumas máquinas):
+
+- regras de firewall bloqueando licenciamento / atualização de software comercial;
+- DLL de licenciamento **sem assinatura válida**;
+- keygens e instaladores antigos;
+- ativadores (famílias KMS / emuladores) e exclusões do Defender para esses caminhos;
+- arquivos de projeto em máquinas **sem** o produto instalado;
+- verificação do arquivo `hosts` (sem bloqueios aos fabricantes nas 9);
+- falsos positivos do matcher (texturas com “crack” no nome, `crackfortran` do numpy, PDFs etc.).
+
+**Problemas observados**
+
+1. Cmdlets do Defender falharam (`0x800106ba`) em **6 de 9** máquinas — restaram eventos `5007`.
+2. Perfis com hive **não** carregado: programas “só para o usuário” e MRU desses perfis não foram lidos.
+3. IDs de pasta inconsistentes (ex.: `EQ1` vs `EQ01`) — cosmético.
+4. O kit **não** hasheia automaticamente binários de licenciamento suspeitos.
+5. Checklist de campo sem capturas manuais de “Sobre” e de Programas e Recursos.
+
+**Roadmap**
+
+- Carregar hive de usuário deslogado (ou documentar workaround).
+- Fallback quando os cmdlets do Defender falham.
+- Hash + verificação de assinatura automáticos de binários de licenciamento.
+- Reduzir falsos positivos do matcher crack/keygen.
+- Teste ponta a ponta como usuário comum (console físico).
+- Validar relaunch 32→64, AppLocker, PCs lentos e AV corporativo agressivo.
+- Incluir capturas manuais (“Sobre”, Programas e Recursos) no checklist de campo.
+
+Ainda valem: hive deslogado não carregado (decisão técnica); data de última gravação de chave de registro não coletada; captura de tela parcial em DPI alto / multi-monitor; plano B (`coleta_minima_v1.2.cmd`) **não** gera `00_RESUMO.txt`. Checklist pré-voo continua obrigatório — ver [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md).
 
 ---
 

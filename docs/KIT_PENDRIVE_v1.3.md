@@ -105,14 +105,23 @@ Nenhum arquivo de usuário é aberto, alterado ou apagado. A coleta do Prefetch 
 - [ ] Pendrive com trava física de escrita: **não** use a trava (o script precisa gravar no pendrive).
 - [ ] Levar: pendrive reserva, planilha de campo impressa, celular para fotos com data e hora, etiquetas EQ01...EQnn.
 - [ ] Depois da diligência: copiar `coleta\` para dois locais, conferir os manifestos e só então trabalhar sobre as cópias.
+- [ ] Em cada PC coletado: capturas manuais de **Sobre** (versão/build do software em análise) e de **Programas e Recursos** / Apps & features (foto ou print), além do `00_RESUMO.txt`.
 
-## 7. Limitações conhecidas (v1.3)
+## 7. Uso em campo, problemas e roadmap (v1.3)
 
-- Herda as da v1.2 (hive de usuário deslogado não carregado; data de última gravação de chave de registro não coletada; captura parcial em DPI alto; seriais Autodesk recentes não ficam no registro).
+Usado em **perícia judicial de inventário de software (Brasil, out/2026)** com a **v1.2** do script (SHA conferido com o `KIT_SHA256` do pendrive). Este arquivo descreve a **v1.3**.
+
+**Em campo (9 PCs):** 7 Win10 Pro + 2 Win11 Pro; domínio e workgroup; PowerShell 5.1 64 bits; todas as coletas como Administrador. Tempo médio ~67 s (27–163 s), nenhuma estourou 240 s. 527 softwares inventariados (~59/PC). Manifesto SHA-256 com 0 falhas nas 9; saída só no pendrive.
+
+**Problemas observados:** cmdlets do Defender falharam (`0x800106ba`) em 6/9 (restaram eventos `5007`); perfis com hive não carregado sem programas por usuário/MRU; IDs de pasta inconsistentes (ex.: EQ1 vs EQ01; cosmético); sem hash automático de binários de licenciamento suspeitos; checklist sem capturas manuais de “Sobre” e Programas e Recursos.
+
+**Ainda limitações técnicas:** hive de usuário deslogado não carregado (decisão técnica); data de última gravação de chave de registro não coletada; captura parcial em DPI alto / multi-monitor; seriais de suites CAD recentes em geral não ficam no registro; plano B (`coleta_minima_v1.2.cmd`) **não** gera `00_RESUMO.txt`.
+
+**Roadmap:** carregar hive deslogado (ou workaround documentado); fallback quando o Defender falha; hash + assinatura automáticos de binários de licenciamento; menos falsos positivos no matcher; teste ponta a ponta como usuário comum; validar relaunch 32→64, AppLocker, PCs lentos e AV corporativo; incluir capturas manuais no checklist.
+
 - O `00_RESUMO.txt` é um **atalho de leitura em campo**. A prova continua sendo o conjunto de CSVs + manifesto. Em caso de dúvida, abra os CSVs.
 - `-Destacar` só prioriza fabricantes no topo do resumo; a coleta ampla (`-Fabricantes` regex) e o restante do resumo permanecem iguais.
-- Plano B (`coleta_minima_v1.2.cmd`) **não** gera `00_RESUMO.txt`.
-- Testado em VM Windows 10 (PowerShell 5.1) com artefatos plantados. Checklist de domingo em PC real continua obrigatório.
+- Checklist de domingo em PC real continua obrigatório (seção 6).
 
 ## Changelog v1.3 (28/10/2026)
 
