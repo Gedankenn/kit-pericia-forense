@@ -1,0 +1,89 @@
+﻿+------------------------------------------------------------------------------+
+|  >_ KIT PERICIA FORENSE                                      [READ-ONLY]     |
+|  __________________________________________________________________________  |
+|   _  __ ___ _____   ____  _____ ____  ___ ____ ___    _                      |
+|  | |/ /|_ _|_   _| |  _ \| ____|  _ \|_ _/ ___|_ _|  / \                     |
+|  | ' /  | |  | |   | |_) |  _| | |_) || | |    | |  / _ \                    |
+|  | . \  | |  | |   |  __/| |___|  _ < | | |___ | | / ___ \                   |
+|  |_|\_\|___| |_|   |_|   |_____|_| \_\___\____|___/_/   \_\                  |
+|  __________________________________________________________________________  |
+|  | Coleta de inventario de software  |  PowerShell 5.1  |  v1.4.4          | |
+|  | Somente leitura na maquina        |  Saida no pendrive |  EQ##          | |
+|  |____[ SHA-256 manifesto ]__________|__[ sem telemetria ]|________________| |
++------------------------------------------------------------------------------+
+
+================================================================
+ RESUMO MINIMO DA COLETA  v1.4.4  (GENERICO)
+ Equip: EQ02   Host: HOST-EXEMPLO
+ Local: 2026-11-02 21:29:10 (Pacific Standard Time, offset -08:00:00)
+ UTC:   2026-11-03 05:29:10
+ Usuario: HOST-EXEMPLO\perito   Admin: True   Duracao: 246s
+ Destacar: (nenhum - relatorio generico completo)
+================================================================
+
+--- 1. DESTAQUE ---
+ (omitido - rode com -Destacar FabricanteA,FabricanteB se quiser priorizar no topo)
+
+--- 2. IRREGULARIDADES / INDICIOS DE PIRATARIA (todos os fabricantes) ---
+
+ A) Keygen / crack / patch / ativador (FORTES): 7
+   [FabricanteB] (1)
+ - C:\TesteBin\xf-prod2020_x64.exe
+   [FabricanteA] (1)
+ - C:\Users\usuario\Downloads\ProdutoGrafico_2020_keygen.zip
+   [Microsoft] (3)
+ - C:\Users\Public\Downloads\AtivadorX_setup.exe
+ - C:\Users\Public\Downloads\ToolkitX.exe
+ - C:\TesteBin\AtivadorX.exe
+   [Outro/indefinido] (2)
+ - C:\Users\Public\Downloads\mega_crack_pack.bin
+ - C:\Users\usuario\Downloads\leia_crack.nfo
+ B) Indicios FRACOS: nenhum
+    (excluidos por -ExclusaoIndicios, ex. ssh-keygen: 1 - ver 11e_)
+ C) Hosts bloqueando ativacao/validacao: 4 linha(s)
+   [FabricanteC]
+ - L26: 127.0.0.1 fabricantec-licensing.fabricantec.com
+   [FabricanteB]
+ - L23: 127.0.0.1 lm.autodesk.com
+ - L24: 127.0.0.1 register.autodesk.com
+   [FabricanteA]
+ - L25: 0.0.0.0 ipm.corel.com
+ D) Servicos de licenca / fabricante: 3
+ - [Outro/indefinido] Client License Service (ClipSVC) | Running | Manual
+ - [Outro/indefinido] Windows License Manager Service | Running | Manual
+ - [Outro/indefinido] Windows Licensing Monitoring Service | Running | Auto
+ E) Instaladores/pacotes soltos (nome fabricante): 2
+ - [FabricanteA] C:\Users\usuario\Downloads\ProdutoGrafico_2020_keygen.zip
+ - [FabricanteA] C:\TesteBin\FabricanteADRW.exe
+ F) Desinstalacoes MSI recentes (autoras da coleta): nenhuma na janela
+ G) Binarios de licenciamento sem assinatura valida: 1 (ver 11d_)
+ H) DLLs de sistema em pasta de programa: 0
+ I) Outros discos/particoes/USB nao varridos: nenhum sinalizado
+ J) Provaveis falsos positivos (nao contam como FORTE): 6 (ver 11f_)
+
+--- 3. SUGESTOES 'vale pesquisar mais neste PC' ---
+ 1. Conferir manualmente os arquivos listados como indicios FORTES (nao executar).
+ 2. hosts alterado com bloqueio de dominio - fotografar e anotar na ata
+ 3. Instaladores soltos presentes - verificar midia/instalacao pendente
+ 4. Binarios de licenciamento sem assinatura valida - conferir 11d_assinaturas_binarios.csv
+ 5. Secao Captura de tela: ERRO Exception calling "CopyFromScreen" with "3" argument(s): "The handle is invalid"
+
+--- 3b. CAPTURAS MANUAIS PENDENTES (checklist) ---
+  [ ] Foto do equipamento + etiqueta EQ + relogio Windows vs referencia
+  [ ] Tela Programas e Recursos / Configuracoes > Aplicativos (filtro por fabricante de interesse)
+  [ ] Tela Sobre do produto (somente se autorizada na ata; por ultimo)
+  [ ] Foto do 00_RESUMO + SHA-256 do manifesto nesta tela
+  Use capturar_tela.cmd EQ## descricao  (ex.: EQ01 apps_fabricanteA)
+
+--- 4. CONTAGENS-CHAVE ---
+ Perfil: exemplo_generico
+ Hives offline: ligado | Provaveis FP: 6 | Copias suspeitos: 8
+ Programas (Uninstall total): 7 | regex coleta (-Fabricantes): 3
+ Arquivos de projeto: 5 | indicios fortes: 7 | fracos: 0 | instaladores: 2
+ Lixeira relevantes: 0 | hosts: 4 | servicos: 3 | remocoes MSI: 0
+ Assinatura invalida/usuario_offline: 1 | DLLs sistema em pasta prog: 0
+ Secoes: OK=15 OK_PARCIAL=0 outras=1 (ver 00_resumo_secoes.csv)
+
+ Pasta da coleta: D:\coleta\EQ02_HOST-EXEMPLO_20261102_212504
+ (Somente leitura na maquina vistoriada. Este resumo entra no manifesto SHA-256.)
+================================================================
