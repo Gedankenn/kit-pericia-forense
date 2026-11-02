@@ -6,9 +6,9 @@
 
 **Coleta forense somente-leitura** de inventário de software em Windows. Feito para vistoria em campo: roda do pendrive, não grava no disco vistoriado, imprime um resumo na tela e fecha com manifesto SHA-256.
 
-> PowerShell 5.1 nativo · saída só no pendrive · `00_RESUMO.txt` genérico · `-Perfil` · hives offline · fallback Defender
+> PowerShell 5.1 nativo · ASCII+UTF-8 BOM · saída só no pendrive · `00_RESUMO.txt` genérico · `-Perfil` · hives offline · fallback Defender
 
-[![versão](https://img.shields.io/badge/versão-1.4-f5a623?style=flat-square)](#)
+[![versão](https://img.shields.io/badge/versão-1.4.2-f5a623?style=flat-square)](#)
 [![somente%20leitura](https://img.shields.io/badge/disco%20vistoriado-READ--ONLY-2ecc71?style=flat-square)](#garantias-somente-leitura)
 [![licença](https://img.shields.io/badge/licença-MIT-blue?style=flat-square)](LICENSE)
 
@@ -41,7 +41,7 @@ Não substitui imagem forense (FTK/E01). É o kit leve de **campo**, para ler na
 | Política de execução intacta | `-ExecutionPolicy Bypass -File` só naquela sessão |
 | Sem cache de módulo no perfil | `PSModuleAnalysisCachePath=NUL` |
 | Sem `Win32_Product` | Inventário via registro .NET (read-only) — não dispara repair MSI |
-| Hive deslogado (v1.4) | Cópia de `NTUSER.DAT` no **pendrive** + `reg load` só da cópia (`-LerHivesOffline`) |
+| Hive deslogado (v1.4+) | Opt-in `-LerHivesOffline` (desligado desde v1.4.2): cópia no pendrive + `reg load` só da cópia |
 | Sem compilar C# | Nada em `%TEMP%` via `Add-Type` |
 | Resumo no manifesto | `00_RESUMO.txt` é escrito **antes** do SHA-256 |
 
@@ -61,7 +61,7 @@ Não substitui imagem forense (FTK/E01). É o kit leve de **campo**, para ler na
 | Projetos | metadados de arquivos de projeto (extensões configuráveis) com timeout por raiz |
 | Histórico | MSI install/remove, Prefetch, Lixeira, Defender |
 
-Detalhamento completo: [`docs/KIT_PENDRIVE_v1.4.md`](docs/KIT_PENDRIVE_v1.4.md).
+Detalhamento completo: [`docs/KIT_PENDRIVE_v1.4.2.md`](docs/KIT_PENDRIVE_v1.4.2.md).
 
 ---
 
@@ -69,8 +69,8 @@ Detalhamento completo: [`docs/KIT_PENDRIVE_v1.4.md`](docs/KIT_PENDRIVE_v1.4.md).
 
 ```
 E:\                                      (NTFS ou exFAT, ≥ 16 GB)
-├── rodar_coleta_v1.4.cmd                ← botão direito → Executar como administrador
-├── coleta_inventario_software_v1.4.ps1
+├── rodar_coleta_v1.4.2.cmd                ← botão direito → Executar como administrador
+├── coleta_inventario_software_v1.4.2.ps1
 ├── perfis\exemplo_generico.psd1        ← listas externas (-Perfil)
 ├── coleta_minima_v1.2.cmd               ← plano B (PowerShell bloqueado)
 ├── capturar_tela.cmd / .ps1
@@ -85,21 +85,21 @@ E:\                                      (NTFS ou exFAT, ≥ 16 GB)
 
 1. Foto do equipamento + etiqueta `EQ01` + relógio do Windows vs. referência.
 2. Plugar o pendrive (**recusar** “verificar e corrigir”).
-3. Botão direito em `rodar_coleta_v1.4.cmd` → **Executar como administrador**.
-4. Digitar o identificador (`EQ01`). Esperar ~3–10 min.
+3. Botão direito em `rodar_coleta_v1.4.2.cmd` → **Executar como administrador**.
+4. Digitar o identificador (`EQ01` ou `1`). Texto livre é rejeitado. Esperar ~3–10 min.
 5. Ler / fotografar o `00_RESUMO.txt` e o hash do manifesto.
 6. Ejetar com segurança.
 
 Equivalente manual:
 
 ```bat
-powershell -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.ps1 -Equip EQ01 -CapturaTela -Perfil E:\perfis\exemplo_generico.psd1
+powershell -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.2.ps1 -Equip EQ01 -CapturaTela -Perfil E:\perfis\exemplo_generico.psd1
 ```
 
 Teste no seu PC (permite gravar em `C:\`):
 
 ```bat
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\coleta_inventario_software_v1.4.ps1 -Equip TESTE -ModoTeste
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\coleta_inventario_software_v1.4.2.ps1 -Equip EQ99 -ModoTeste
 ```
 
 ---
@@ -154,7 +154,7 @@ Verificação do kit (antes de sair): [`docs/INTEGRIDADE.md`](docs/INTEGRIDADE.m
 
 ## Uso em campo (perícia judicial)
 
-Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em campo rodou a **v1.2** (SHA conferido com o `KIT_SHA256` do pendrive). Este repositório publica a **v1.4**, que incorpora as correções sugeridas após o campo.
+Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em campo rodou a **v1.2** (SHA conferido com o `KIT_SHA256` do pendrive). Este repositório publica a **v1.4.2** (encoding PS 5.1 + hives opt-in). A v1.4 incorporou as correções sugeridas após o campo.
 
 | | Em campo |
 |---|---|
@@ -195,7 +195,19 @@ Usado em **perícia judicial de inventário de software (Brasil, out/2026)**. Em
 | Listas no script | `-Perfil` (`.psd1`/`.json`); exemplo em `perfis/` |
 | Capturas manuais | checklist no `00_RESUMO` + [`docs/CHECKLIST_CAMPO_v1.4.md`](docs/CHECKLIST_CAMPO_v1.4.md) |
 
-**Ainda em aberto:** teste ponta a ponta como usuário comum no console físico; AppLocker / relaunch 32→64 em ambiente restrito; PCs lentos + AV corporativo agressivo; data de última gravação de chave de registro; plano B sem `00_RESUMO`. Guia: [`docs/KIT_PENDRIVE_v1.4.md`](docs/KIT_PENDRIVE_v1.4.md).
+**Ainda em aberto:** teste ponta a ponta como usuário comum no console físico; AppLocker / relaunch 32→64 em ambiente restrito; PCs lentos + AV corporativo agressivo; data de última gravação de chave de registro; plano B sem `00_RESUMO`. Guia: [`docs/KIT_PENDRIVE_v1.4.2.md`](docs/KIT_PENDRIVE_v1.4.2.md).
+
+---
+
+## Changelog rápido
+
+| Versão | Destaque |
+|---|---|
+| **v1.4.2** | `-LerHivesOffline` **opt-in** (desligado por padrão; `KIT_HIVES=1` no `.cmd`). |
+| v1.4.1 | Script **100% ASCII + UTF-8 BOM** (corrige `ParserError` PS 5.1/cp1252). ID obrigatório `EQ##` (código 6). |
+| v1.4 | Hives offline, fallback Defender, hash/assinatura de suspeitos, menos FP, `-Perfil`, checklist de capturas. |
+| v1.3 | `00_RESUMO.txt` genérico + `-Destacar`. |
+| v1.2 | Campo (9 PCs); exclusão de indícios legítimos (`ssh-keygen`). |
 
 ---
 
@@ -208,15 +220,21 @@ kit-pericia-forense/
 ├── KIT_SHA256.txt
 ├── .gitignore
 ├── scripts/
-│   ├── coleta_inventario_software_v1.4.ps1   ← atual
+│   ├── coleta_inventario_software_v1.4.2.ps1   ← atual
+│   ├── rodar_coleta_v1.4.2.cmd
+│   ├── coleta_inventario_software_v1.4.1.ps1
+│   ├── rodar_coleta_v1.4.1.cmd
+│   ├── coleta_inventario_software_v1.4.ps1
 │   ├── rodar_coleta_v1.4.cmd
-│   ├── coleta_inventario_software_v1.3.ps1   (histórico)
+│   ├── coleta_inventario_software_v1.3.ps1
 │   ├── rodar_coleta_v1.3.cmd
 │   ├── coleta_minima_v1.2.cmd
 │   └── capturar_tela.*
 ├── perfis/
 │   └── exemplo_generico.psd1
 ├── docs/
+│   ├── KIT_PENDRIVE_v1.4.2.md
+│   ├── KIT_PENDRIVE_v1.4.1.md
 │   ├── KIT_PENDRIVE_v1.4.md
 │   ├── CHECKLIST_CAMPO_v1.4.md
 │   ├── PLANO_v1.4.md

@@ -18,3 +18,13 @@ da5e2a90d0d31d12794ba3c9eb4cf575e38295a887525dccccfd4d7b4d698abf  docs/PLANO_v1.
 33dbde2bdac86560d984d6f2d9a8c6bc6355e90f6037972cfd1606075eed8930  scripts/coleta_minima_v1.2.cmd
 b86679eda1aeabf290d4437d5dd66c7b3607e3a09b3247d877a21edc1e6a8a71  scripts/capturar_tela.cmd
 29254a2d84dfc06da5462c35eb8203cabb05db21189b9f8620bf9854348aa95a  scripts/capturar_tela.ps1
+
+# --- v1.4.1 ---
+62205da8c5baff2aef1193f29bdeb5557f3334ae91da92abaaeb731ac940cdaf  scripts/coleta_inventario_software_v1.4.1.ps1
+fad59769eef20f2e3c8e4fcae62923a64594910377eb5620b608b57023b70622  scripts/rodar_coleta_v1.4.1.cmd
+38c649f6c017a878b979bd44a58cfe5eeaf39d7302f054105c49ef26ada0e0cc  docs/KIT_PENDRIVE_v1.4.1.md
+
+# --- v1.4.2 ---
+d92c21bab002f9c6b92a051052f2edbbdffe0ff9dd2d7fed5310c0f8fa7b5156  scripts/coleta_inventario_software_v1.4.2.ps1
+1a3d0297a7c458d828681175b41b39829ac06140c5008b48aa1e9db5e5b8034b  scripts/rodar_coleta_v1.4.2.cmd
+2d8eb16ffdd30fa20b983bb826258bb2d83ff043ac0cef2dc2dbde8aebbefb8f  docs/KIT_PENDRIVE_v1.4.2.md
