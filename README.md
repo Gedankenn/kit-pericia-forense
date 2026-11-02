@@ -1,7 +1,3 @@
-# Kit Pericia Forense
-
-Coleta **somente leitura** de inventario de software em Windows (PowerShell 5.1), pensada para vistoria judicial / pericia. Saida no pendrive, manifesto SHA-256, sem telemetria.
-
 ```
 +------------------------------------------------------------------------------+
 |  >_ KIT PERICIA FORENSE                                      [READ-ONLY]     |
@@ -18,100 +14,206 @@ Coleta **somente leitura** de inventario de software em Windows (PowerShell 5.1)
 +------------------------------------------------------------------------------+
 ```
 
-![Banner no console](img/01_banner_inicio.png)
+# Kit Pericia Forense
 
-**Autor:** Fabio Slika Stella — CREA/PR PR-224755/D  
-**Versao atual:** `v1.4.4` (`scripts/coleta_inventario_software_v1.4.4.ps1`)
+![versao](https://img.shields.io/badge/versao-v1.4.4-FFB000?style=flat-square&labelColor=1a1200)
+![ps](https://img.shields.io/badge/PowerShell-5.1-4472C4?style=flat-square&labelColor=1a1200)
+![win](https://img.shields.io/badge/Windows-10%20%2F%2011-00A4EF?style=flat-square&labelColor=1a1200)
+![licenca](https://img.shields.io/badge/licenca-MIT-22c55e?style=flat-square&labelColor=1a1200)
+![telemetria](https://img.shields.io/badge/telemetria-nenhuma-111827?style=flat-square&labelColor=1a1200)
+![metrics](https://img.shields.io/badge/metrics-off-111827?style=flat-square&labelColor=1a1200)
+
+**Coleta somente-leitura de inventario de software para vistoria / pericia judicial.**  
+Roda no pendrive, grava so no pendrive, fecha com manifesto SHA-256. Sem telemetria, sem phone-home, sem nuvem.
+
+> Autor: **Fabio Slika Stella** — CREA/PR PR-224755/D  
+> Script atual: [`scripts/coleta_inventario_software_v1.4.4.ps1`](scripts/coleta_inventario_software_v1.4.4.ps1) · Lancador: [`scripts/rodar_coleta_v1.4.4.cmd`](scripts/rodar_coleta_v1.4.4.cmd)
 
 ---
 
-## O que faz
+## Galeria — fluxo na VM de teste
 
-1. Inventaria programas (Uninstall 64/32 + HKEY_USERS), Prefetch, hosts, firewall, Defender (com fallback via registro), eventos MSI, arquivos de projeto e **indicios de crack/keygen/ativador**.
-2. Carrega hives de usuarios deslogados a partir de **copia** do `NTUSER.DAT` no pendrive (padrao ligado se admin).
-3. Copia automaticamente suspeitos para `suspeitos_copias\` (SHA-256 origem/destino). Arquivos **> 500 MB** pedem confirmacao S/N.
-4. Gera `00_RESUMO.txt` (com o banner) **antes** do `MANIFESTO_SHA256.txt`.
+Sequencia real do console (estilo amber HUD). Hostnames e caminhos de exemplo sao genericos.
 
-Nao instala, nao altera e nao apaga nada na maquina vistoriada. O Windows ainda registra a conexao do pendrive e a execucao do PowerShell (efeito da diligencia).
+| # | Cena | Preview |
+|---|------|---------|
+| 01 | Banner no inicio da execucao | ![01 banner](img/01_banner_inicio.png) |
+| 02 | Prompt do ID `EQ##` (rejeita texto livre) | ![02 EQ](img/02_prompt_EQ.png) |
+| 03 | Prompt de arquivo suspeito **> 500 MB** | ![03 500MB](img/03_prompt_500MB.png) |
+| 04 | Progresso das secoes | ![04 secoes](img/04_progresso_secoes.png) |
+| 05 | `00_RESUMO.txt` (com banner no topo) | ![05 resumo](img/05_00_RESUMO.png) |
+| 06 | Verificacao do manifesto SHA-256 | ![06 manifesto](img/06_manifesto_verify.png) |
+| 07 | Tela final **COLETA CONCLUIDA** | ![07 fim](img/07_coleta_concluida.png) |
 
 ---
 
-## Prints (VM de teste)
+## O que e
 
-| Cena | Imagem |
-|------|--------|
-| Banner no inicio | ![banner](img/01_banner_inicio.png) |
-| Prompt ID EQ## (rejeita texto livre) | ![EQ](img/02_prompt_EQ.png) |
-| Prompt arquivo > 500 MB | ![500MB](img/03_prompt_500MB.png) |
-| Progresso das secoes | ![secoes](img/04_progresso_secoes.png) |
-| `00_RESUMO.txt` | ![resumo](img/05_00_RESUMO.png) |
-| Verificacao do manifesto | ![manif](img/06_manifesto_verify.png) |
-| Tela final COLETA CONCLUIDA | ![fim](img/07_coleta_concluida.png) |
+Kit de campo para **inventario forense de software** em Windows. O perito leva o pendrive, executa o lancador como administrador, informa o identificador do equipamento (`EQ01`, `EQ02`…) e leva embora so o que foi gravado na pasta `coleta\` do proprio pendrive.
+
+Pensado para ata / laudo: saida estruturada (CSV + TXT), resumo minimo legivel na tela, e cadeia de custodia via `MANIFESTO_SHA256.txt`.
+
+---
+
+## Garantias (read-only)
+
+| Garantia | Como |
+|----------|------|
+| Nao instala / nao desinstala / nao repara MSI | Nao usa `Win32_Product`; le Uninstall via .NET somente leitura |
+| Nao altera arquivos da maquina vistoriada | Leituras com share de leitura; timestamps da origem conferidos nas copias |
+| Saida so no pendrive | Recusa gravar no disco do sistema (salvo `-ModoTeste` no PC do perito) |
+| Hives de usuarios deslogados | Copia `NTUSER.DAT` **para o pendrive** e faz `reg load` so da copia; `unload` no `finally` |
+| Sem telemetria | Sem rede propria do kit, sem metrics, sem update check |
+| Integridade | Todo arquivo gerado entra no manifesto SHA-256 (incluindo o `00_RESUMO.txt`) |
+
+Inevitavel (efeito da diligencia, anotar na ata): o Windows registra a conexao do pendrive e a execucao do PowerShell (Prefetch, USBSTOR, logs).
+
+---
+
+## O que coleta
+
+- Identificacao do host, discos, volumes, perfis
+- Programas (Uninstall 64/32 + `HKEY_USERS`)
+- Prefetch, Recent/Jump Lists, MRU (quando hive disponivel)
+- Hosts e regras de firewall ligadas a licenciamento/ativacao
+- Eventos MSI, limpeza de logs, servicos
+- Defender: deteccoes/exclusoes (cmdlet com **fallback via registro**)
+- Arquivos de projeto (extensoes configuraveis) e indicios de crack/keygen/ativador
+- Authenticode + SHA-256 de binarios de licenciamento / indicios fortes
+- **Copia automatica** dos suspeitos para `suspeitos_copias\` (CSV `11g_`; FP em `11f_` nao sao copiados)
+- Resumo generico `00_RESUMO.txt` + manifesto
+
+Listas de fabricantes/indicios podem ir num `-Perfil` externo (`.psd1` / `.json`) para nao hardcodar o caso no script publicado.
+
+---
+
+## Novidades v1.4.x
+
+| Versao | Destaque |
+|--------|----------|
+| **1.4.4** | Banner ASCII cyber/HUD (80 colunas) no console e no topo do `00_RESUMO`; fallback `FileShare` na copia de `NTUSER.DAT` travado |
+| **1.4.3** | Hives offline **ligados por padrao** (admin); copia automatica de suspeitos; prompt S/N se arquivo **> 500 MB**; checagem de espaco livre |
+| **1.4.1** | Script **100% ASCII + UTF-8 BOM** (corrige `ParserError` do PS 5.1/cp1252 com em-dash); ID obrigatorio `EQ##` |
+| **1.4** | Hives via copia no pendrive; fallback Defender; hash/assinatura; menos FP (`11f_`); `-Perfil`; checklist de capturas manuais |
+
+Versoes antigas ficam lado a lado em `scripts/` — **nunca sobrescritas**.
 
 ---
 
 ## Uso rapido (pendrive)
 
-1. Copie o conteudo de `scripts/` + `perfis/exemplo_generico.psd1` + `KIT_SHA256.txt` para a raiz do pendrive.
+1. Copie para a raiz do pendrive:
+   - `scripts/coleta_inventario_software_v1.4.4.ps1`
+   - `scripts/rodar_coleta_v1.4.4.cmd`
+   - `perfis/exemplo_generico.psd1` (opcional)
+   - `KIT_SHA256.txt` + docs do pendrive (opcional)
 2. No PC vistoriado: botao direito em `rodar_coleta_v1.4.4.cmd` → **Executar como administrador**.
-3. Informe o ID (`EQ01` ou so `1`). Texto livre (ex.: `mamae2`) e rejeitado.
-4. Fotografe o resumo + hash do manifesto; siga o checklist de capturas manuais.
+3. Informe o ID (`EQ01` ou so `1`). Texto livre e **rejeitado** (codigo de saida `6`).
+4. Se aparecer arquivo **> 500 MB**, responda `S` ou `N` (a decisao vai para `11g_copias_suspeitos.csv`).
+5. Fotografe o resumo + hash do manifesto; siga o checklist de capturas manuais.
 
-Parametros uteis:
-
-| Parametro | Efeito |
-|-----------|--------|
-| `-SemHivesOffline` | Desliga carga de hives deslogados |
-| `-SemCopiarSuspeitos` | Desliga copia automatica |
-| `-RespostaCopiaGrande S\|N` | Resposta automatica ao prompt >500 MB (teste) |
-| `-Destacar FabricanteA,FabricanteB` | Destaca no topo do resumo (nunca oculta o resto) |
-| `-Perfil caminho.psd1` | Listas externas (fabricantes/indicios) |
-| `-ModoTeste` | Permite gravar fora do pendrive (so no PC do perito) |
+Codigos de saida: `0` ok · `2` destino recusado · `3`/`4` pasta · `5` perfil · `6` ID invalido.
 
 ---
 
-## Uso em campo (referencia)
+## Parametros principais
 
-Pericia judicial de inventario de software (Brasil, out/2026), kit v1.2 em campo; laboratorio validou v1.4.x em VM Win10 PS 5.1:
+| Parametro | Padrao | Efeito |
+|-----------|--------|--------|
+| `-Equip` | (obrigatorio) | `EQ##` — aceita `1` / `EQ1` / `EQ01` |
+| `-Destino` | `.\coleta` | Pasta de saida (deve ficar no pendrive) |
+| `-Perfil` | — | `.psd1` / `.json` com listas externas |
+| `-CapturaTela` | off | PNG da tela no inicio (precisa sessao interativa) |
+| `-SemHivesOffline` | — | Desliga carga de hives deslogados |
+| `-SemCopiarSuspeitos` | — | Desliga copia automatica |
+| `-RespostaCopiaGrande S\|N` | pergunta | Resposta automatica ao limiar >500 MB (teste/CI) |
+| `-LimitePerguntaCopiaMB` | `500` | Limiar do prompt |
+| `-Destacar` | vazio | Destaca fabricantes no topo do resumo (**nunca oculta** o resto) |
+| `-ModoTeste` | off | Permite gravar fora do pendrive (so no PC do perito) |
 
-- 9 PCs em campo (v1.2): media ~67 s/PC; 527 softwares; manifesto SHA-256 com 0 falhas.
-- VM v1.4.4 (admin): ~250–300 s sob emulacao TCG; hives OK; copia de suspeitos com hash igual a origem; FP (`11f_`) nao copiados; `mega_crack` >500 MB respeita S/N.
+Atalhos do `.cmd`: `set KIT_HIVES=0` desliga hives; `set KIT_COPIA_GRANDE=S` (ou `N`) responde o prompt grande.
 
 ---
 
-## Fluxo
+## Saida, manifesto e integridade
+
+Estrutura tipica apos uma coleta:
 
 ```
-[pendrive] rodar_coleta_v1.4.4.cmd
-    -> banner ASCII
-    -> valida EQ##
-    -> secoes (Prefetch, hives, Uninstall, hosts/firewall, Defender, varredura, assinaturas)
-    -> copia suspeitos (11g_)
-    -> unload hives (finally)
-    -> 00_RESUMO.txt (com banner)
-    -> MANIFESTO_SHA256.txt + .sha256
+D:\coleta\EQ01_HOSTNAME_yyyyMMdd_HHmmss\
+├── 00_RESUMO.txt              ← banner + irregularidades + checklist
+├── 00_log_execucao.txt
+├── 00_resumo_secoes.csv
+├── 11_indicios_*.csv / 11f_ / 11g_
+├── suspeitos_copias\...       ← copias com caminho relativo
+├── hives_offline\...          ← copias de NTUSER.DAT (se hives ligados)
+├── MANIFESTO_SHA256.txt
+└── MANIFESTO_SHA256.txt.sha256
 ```
 
----
-
-## Integridade
-
-Hashes em [`KIT_SHA256.txt`](KIT_SHA256.txt). Versoes antigas sao preservadas lado a lado (nunca sobrescritas).
+Conferir o kit no pendrive:
 
 ```bash
 sha256sum -c KIT_SHA256.txt --ignore-missing
 ```
 
----
-
-## Limitacoes / ainda a validar
-
-- Captura de tela via SSH/sessao sem desktop interativo falha (usar console fisico ou `capturar_tela.cmd`).
-- Relaunch 32→64 bits sob AppLocker restrito e PCs com AV corporativo agressivo: checklist de campo continua obrigatorio.
-- Plano B `coleta_minima_v1.2.cmd` nao gera `00_RESUMO.txt`.
+Hashes oficiais: [`KIT_SHA256.txt`](KIT_SHA256.txt) · Guia do pendrive: [`docs/KIT_PENDRIVE_v1.4.4.md`](docs/KIT_PENDRIVE_v1.4.4.md) · Exemplo de resumo: [`exemplos/exemplo_00_RESUMO_v1.4.4.txt`](exemplos/exemplo_00_RESUMO_v1.4.4.txt)
 
 ---
 
-## Licenca
+## Cenarios testados (laboratorio)
 
-Uso pericial / forense. Sem telemetria. Nao publicar dados de casos reais neste repositorio.
+VM Windows 10 Enterprise Eval, PowerShell 5.1, QEMU TCG (sem KVM), pendrive simulado.
+
+| Cenario | Versao | Resultado |
+|---------|--------|-----------|
+| Admin, resposta **N** ao arquivo >500 MB | 1.4.3 | OK (~4 min sob TCG); decisao `PULADO_OPERADOR_N`; FPs nao copiados; manifesto confere |
+| Admin, resposta **S** ao arquivo >500 MB | 1.4.4 | OK; banner no console e no resumo; hive offline via copia; `COPIADO_APOS_SIM` com HashOk; unload no finally |
+| Usuario padrao (sem admin) | 1.4.4 | OK; hives desligados automaticamente; copia de suspeitos acessiveis segue |
+
+Ainda a validar em campo: relaunch 32→64 sob AppLocker restrito; PC lento / AV corporativo agressivo; captura de tela exige console interativo (SSH puro falha no `CopyFromScreen`).
+
+---
+
+## Uso em campo (referencia)
+
+Pericia judicial de inventario de software (Brasil, out/2026) — **sem identificar partes, processo ou fabricantes da acao**:
+
+- 9 PCs Windows (7 Win10 Pro, 2 Win11 Pro), todos como Administrador
+- Tempo medio ~**67 s**/PC (min 27, max 163); nenhuma varredura estourou 240 s
+- **527** softwares inventariados (media ~59/PC)
+- Manifesto SHA-256: **0 falhas** nas 9 coletas; saida so no pendrive
+- Campo rodou **v1.2**; laboratorio validou a linha **v1.4.x** na VM
+
+Achados tipicos (genericos): regras de firewall bloqueando licenciamento; DLL de licenca sem assinatura valida; keygens/ativadores; exclusoes do Defender; arquivos de projeto sem o produto instalado; falsos positivos do matcher (texturas com "crack" no nome, etc. — agora separados em `11f_`).
+
+---
+
+## Roadmap
+
+- [ ] Carregar hive deslogado ainda mais robusto / documentar workaround de campo
+- [ ] Menos FP no matcher (alem de `11f_`)
+- [ ] Hash/assinatura automaticos ja feitos na 1.4 — expandir candidatos
+- [ ] Teste ponta a ponta: usuario no console fisico; AppLocker; AV corporativo
+- [ ] Plano B (`coleta_minima`) gerar resumo minimo compativel
+
+---
+
+## Changelog resumido
+
+- **v1.4.4** — Banner ASCII HUD; fallback FileShare em NTUSER travado  
+- **v1.4.3** — Hives ON por padrao; copia automatica + prompt >500 MB; `11g_`  
+- **v1.4.1** — ASCII + UTF-8 BOM; ID `EQ##` obrigatorio  
+- **v1.4** — Hives offline, Defender fallback, FP, `-Perfil`, checklist  
+- **v1.3** — `00_RESUMO` generico + `-Destacar`  
+- **v1.2** — Exclusao de indicios (ex.: SSH-KEYGEN)  
+
+Detalhes: [`docs/KIT_PENDRIVE_v1.4.4.md`](docs/KIT_PENDRIVE_v1.4.4.md)
+
+---
+
+## Licenca e autor
+
+[MIT](LICENSE) © 2026 Fabio Slika Stella (CREA/PR PR-224755/D).
+
+Uso pericial / forense bem-vindo. **Nao publique dados de casos reais neste repositorio.** Sem telemetria.
