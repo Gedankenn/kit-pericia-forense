@@ -1,15 +1,15 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 REM ==========================================================================
-REM  rodar_coleta_v1.4.5.cmd - lancador da coleta v1.4.5 (pericia, SOMENTE LEITURA)
+REM  rodar_coleta_v1.4.6.cmd - lancador da coleta v1.4.6 (pericia, SOMENTE LEITURA)
 REM  Uso: clicar com o botao direito > "Executar como administrador".
 REM  Tudo e gravado no proprio pendrive (pasta coleta\ ao lado deste arquivo).
+REM  v1.4.6: menos FP servicos; copia hive sessao ativa; filtra SEM_EVENTOS/Public;
+REM          herda EQ## batch puro (aceita eq01); hives offline ON; copia suspeitos >500MB.
 REM  v1.4.5: EQ## validado em batch puro (sem PowerShell inline); aceita eq01.
-REM  v1.4.4: hives offline LIGADOS por padrao; copia automatica de suspeitos;
-REM          pergunta S/N se arquivo > 500 MB; script ASCII+UTF-8 BOM; ID EQ##.
 REM ==========================================================================
 set "KIT=%~dp0"
-set "SCRIPT=%KIT%coleta_inventario_software_v1.4.5.ps1"
+set "SCRIPT=%KIT%coleta_inventario_software_v1.4.6.ps1"
 set "PERFIL=%KIT%perfis\exemplo_generico.psd1"
 
 set "PSEXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -45,8 +45,17 @@ REM ---------------------------------------------------------------------------
 set "EQOK="
 set "RAW=!EQ!"
 if not defined RAW goto eq_bad
-REM trim leading/trailing spaces (simple)
+REM trim leading spaces + CR/trailing spaces (echo/pipe pode deixar espaco no fim)
 for /f "tokens=* delims= " %%A in ("!RAW!") do set "RAW=%%A"
+if not defined RAW goto eq_bad
+REM remove trailing CR and spaces
+for /f "tokens=* delims= " %%A in ("!RAW!") do set "RAW=%%A"
+:trim_trail
+if "!RAW!"=="" goto eq_bad
+if not "!RAW:~-1!"==" " if not "!RAW:~-1!"=="	" goto trim_done
+set "RAW=!RAW:~0,-1!"
+goto trim_trail
+:trim_done
 if not defined RAW goto eq_bad
 
 set "NUM=!RAW!"
@@ -116,6 +125,6 @@ set "RC=%ERRORLEVEL%"
 echo.
 echo Codigo de saida: %RC%  (0 = ok; 2 = destino recusado; 3/4 = erro de pasta; 5 = perfil; 6 = ID invalido)
 echo Fotografe a tela com o RESUMO e o hash do manifesto antes de fechar.
-echo Checklist: capturas manuais de Programas e Recursos / Sobre (ver KIT_PENDRIVE_v1.4.5.md).
+echo Checklist: capturas manuais de Programas e Recursos / Sobre (ver KIT_PENDRIVE_v1.4.6.md).
 pause
 endlocal
