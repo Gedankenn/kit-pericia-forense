@@ -1,7 +1,7 @@
 # Hashes SHA-256 dos arquivos do kit presentes neste repositorio.
-# Intermediarias (v1.4, v1.4.1, v1.4.2, v1.4.3) foram removidas da arvore;
+# Intermediarias (v1.4 ate v1.4.4) foram removidas da arvore;
 # permanecem no historico git. Conferencia: sha256sum -c KIT_SHA256.txt --ignore-missing
-# (nomes sao basenames — rode a partir da pasta do kit no pendrive).
+# (nomes sao basenames - rode a partir da pasta do kit no pendrive).
 
 # --- v1.3 2026-10-28 America/Sao_Paulo (oficial estavel pre-1.4; resumo generico + -Destacar) ---
 83e04ecbe2fe573c64d0c84d9dcdac5d00ae11ebbaf3c95c627d468637c75df7  coleta_inventario_software_v1.3.ps1
@@ -13,10 +13,10 @@
 b86679eda1aeabf290d4437d5dd66c7b3607e3a09b3247d877a21edc1e6a8a71  capturar_tela.cmd
 29254a2d84dfc06da5462c35eb8203cabb05db21189b9f8620bf9854348aa95a  capturar_tela.ps1
 
-# --- v1.4.4 2026-11-02 America/Sao_Paulo (atual; banner ASCII + hive FileShare fallback) ---
-687bf759a2ba71700ac690cbf303a30c7c7f3bb48953485813cf4360a0d35e9f  coleta_inventario_software_v1.4.4.ps1
-2a59559ccf70d6308570999828fd003c187ab02203ba4fab6d60a7f43da64a77  rodar_coleta_v1.4.4.cmd
-fc26e3018abe927b3af4c129124c8671f63836cbc368012484b8b689ab030bb2  KIT_PENDRIVE_v1.4.4.md
+# --- v1.4.5 2026-11-03 America/Sao_Paulo (atual; EQ## batch puro no .cmd; aceita eq01) ---
+eda7faf76f97aa307114a47069e2990ba356069030d2fe8256cb18042662d70c  coleta_inventario_software_v1.4.5.ps1
+1df9ea5c585354c4f730dd4afc30aedb9bf08d72eff1fca45b607f4e38232018  rodar_coleta_v1.4.5.cmd
+6f563d32e8207320e89ae4ea69f55c799e478331bcdb31b4e7c3913608dc193c  KIT_PENDRIVE_v1.4.5.md
 
 # --- docs / perfil de exemplo (linha 1.4) ---
 ac79f97d74273868fb30bf571ae8332bcbd2444487fce9202184b28b645252c8  CHECKLIST_CAMPO_v1.4.md

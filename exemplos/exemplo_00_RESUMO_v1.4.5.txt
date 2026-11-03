@@ -1,4 +1,4 @@
-﻿+------------------------------------------------------------------------------+
++------------------------------------------------------------------------------+
 |  >_ KIT PERICIA FORENSE                                      [READ-ONLY]     |
 |  __________________________________________________________________________  |
 |   _  __ ___ _____   ____  _____ ____  ___ ____ ___    _                      |
@@ -7,17 +7,17 @@
 |  | . \  | |  | |   |  __/| |___|  _ < | | |___ | | / ___ \                   |
 |  |_|\_\|___| |_|   |_|   |_____|_| \_\___\____|___/_/   \_\                  |
 |  __________________________________________________________________________  |
-|  | Coleta de inventario de software  |  PowerShell 5.1  |  v1.4.4          | |
+|  | Coleta de inventario de software  |  PowerShell 5.1  |  v1.4.5          | |
 |  | Somente leitura na maquina        |  Saida no pendrive |  EQ##          | |
 |  |____[ SHA-256 manifesto ]__________|__[ sem telemetria ]|________________| |
 +------------------------------------------------------------------------------+
 
 ================================================================
- RESUMO MINIMO DA COLETA  v1.4.4  (GENERICO)
- Equip: EQ02   Host: HOST-EXEMPLO
- Local: 2026-11-02 21:29:10 (Pacific Standard Time, offset -08:00:00)
- UTC:   2026-11-03 05:29:10
- Usuario: HOST-EXEMPLO\perito   Admin: True   Duracao: 246s
+ RESUMO MINIMO DA COLETA  v1.4.5  (GENERICO)
+ Equip: EQ01   Host: HOSTNAME
+ Local: 2026-11-03 18:30:03 (Pacific Standard Time, offset -08:00:00)
+ UTC:   2026-11-04 02:30:03
+ Usuario: HOSTNAME\perito   Admin: True   Duracao: 149s
  Destacar: (nenhum - relatorio generico completo)
 ================================================================
 
@@ -27,34 +27,34 @@
 --- 2. IRREGULARIDADES / INDICIOS DE PIRATARIA (todos os fabricantes) ---
 
  A) Keygen / crack / patch / ativador (FORTES): 7
-   [FabricanteB] (1)
- - C:\TesteBin\xf-prod2020_x64.exe
-   [FabricanteA] (1)
- - C:\Users\usuario\Downloads\ProdutoGrafico_2020_keygen.zip
+   [Autodesk] (1)
+ - C:\TesteBin\xf-adsk2020_x64.exe
+   [Corel] (1)
+ - C:\Users\usuario\Downloads\CorelDRAW_2020_keygen.zip
    [Microsoft] (3)
- - C:\Users\Public\Downloads\AtivadorX_setup.exe
- - C:\Users\Public\Downloads\ToolkitX.exe
- - C:\TesteBin\AtivadorX.exe
+ - C:\Users\Public\Downloads\KMSpico_setup.exe
+ - C:\Users\Public\Downloads\Microsoft_Toolkit.exe
+ - C:\TesteBin\KMSpico.exe
    [Outro/indefinido] (2)
  - C:\Users\Public\Downloads\mega_crack_pack.bin
  - C:\Users\usuario\Downloads\leia_crack.nfo
  B) Indicios FRACOS: nenhum
     (excluidos por -ExclusaoIndicios, ex. ssh-keygen: 1 - ver 11e_)
  C) Hosts bloqueando ativacao/validacao: 4 linha(s)
-   [FabricanteC]
- - L26: 127.0.0.1 fabricantec-licensing.fabricantec.com
-   [FabricanteB]
+   [Adobe]
+ - L26: 127.0.0.1 adobe-licensing.adobe.com
+   [Autodesk]
  - L23: 127.0.0.1 lm.autodesk.com
  - L24: 127.0.0.1 register.autodesk.com
-   [FabricanteA]
+   [Corel]
  - L25: 0.0.0.0 ipm.corel.com
  D) Servicos de licenca / fabricante: 3
  - [Outro/indefinido] Client License Service (ClipSVC) | Running | Manual
  - [Outro/indefinido] Windows License Manager Service | Running | Manual
  - [Outro/indefinido] Windows Licensing Monitoring Service | Running | Auto
  E) Instaladores/pacotes soltos (nome fabricante): 2
- - [FabricanteA] C:\Users\usuario\Downloads\ProdutoGrafico_2020_keygen.zip
- - [FabricanteA] C:\TesteBin\FabricanteADRW.exe
+ - [Corel] C:\Users\usuario\Downloads\CorelDRAW_2020_keygen.zip
+ - [Corel] C:\TesteBin\CorelDRW.exe
  F) Desinstalacoes MSI recentes (autoras da coleta): nenhuma na janela
  G) Binarios de licenciamento sem assinatura valida: 1 (ver 11d_)
  H) DLLs de sistema em pasta de programa: 0
@@ -77,13 +77,13 @@
 
 --- 4. CONTAGENS-CHAVE ---
  Perfil: exemplo_generico
- Hives offline: ligado | Provaveis FP: 6 | Copias suspeitos: 8
+ Hives offline: ligado | Provaveis FP: 6 | Copias suspeitos: 7
  Programas (Uninstall total): 7 | regex coleta (-Fabricantes): 3
  Arquivos de projeto: 5 | indicios fortes: 7 | fracos: 0 | instaladores: 2
  Lixeira relevantes: 0 | hosts: 4 | servicos: 3 | remocoes MSI: 0
- Assinatura invalida/usuario_offline: 1 | DLLs sistema em pasta prog: 0
+ Assinatura invalida/ausente: 1 | DLLs sistema em pasta prog: 0
  Secoes: OK=15 OK_PARCIAL=0 outras=1 (ver 00_resumo_secoes.csv)
 
- Pasta da coleta: D:\coleta\EQ02_HOST-EXEMPLO_20261102_212504
+ Pasta da coleta: D:\coleta\EQ01_HOSTNAME_20261103_182734
  (Somente leitura na maquina vistoriada. Este resumo entra no manifesto SHA-256.)
 ================================================================

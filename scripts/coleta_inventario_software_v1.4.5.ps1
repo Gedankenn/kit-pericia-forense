@@ -1,7 +1,8 @@
 ﻿<#
-  coleta_inventario_software_v1.4.4.ps1 - Pericia judicial (vistoria de software)
+  coleta_inventario_software_v1.4.5.ps1 - Pericia judicial (vistoria de software)
   Perito: Fabio Slika Stella - CREA/PR PR-224755/D
-  Versao 1.4.4 (02/11/2026) - baseada na v1.4.2 (originais preservados ao lado)
+  Versao 1.4.5 (03/11/2026) - baseada na v1.4.4 (originais preservados ao lado)
+  v1.4.5: lancador .cmd sem PowerShell inline (EQ## validado em batch puro; aceita eq01).
   v1.4.4: banner ASCII cyber/HUD (80 colunas) no inicio e no topo do 00_RESUMO;
         fallback de copia de NTUSER.DAT com FileShare (hive eventualmente travado).
   v1.4.3: -LerHivesOffline LIGADO por padrao (desliga com -SemHivesOffline);
@@ -26,9 +27,9 @@
     (por padrao <pasta do script>\coleta). Ao final gera manifesto SHA-256 de todos os
     arquivos produzidos.
 
-  COMO USAR (recomendado: pelo lancador rodar_coleta_v1.4.4.cmd, clicando com o botao direito
+  COMO USAR (recomendado: pelo lancador rodar_coleta_v1.4.5.cmd, clicando com o botao direito
   em "Executar como administrador"). Linha de comando equivalente:
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.4.ps1 -Equip EQ01 -CapturaTela
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.5.ps1 -Equip EQ01 -CapturaTela
 
   PARAMETROS PRINCIPAIS
     -Equip                 identificador EQ## (aceita 1/EQ1/EQ01; rejeita texto livre; codigo 6 se invalido)
@@ -124,7 +125,7 @@ if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProces
 $ErrorActionPreference = 'SilentlyContinue'   # erros sao contados e registrados no log por secao
 $env:PSModuleAnalysisCachePath = 'NUL'         # nao gravar cache de modulos no perfil da maquina vistoriada (v1.1 testes em VM)
 $ProgressPreference    = 'SilentlyContinue'
-$VersaoScript = '1.4.4'
+$VersaoScript = '1.4.5'
 # -Destacar opcional: Corel,Autodesk ou varios -Destacar Corel -Destacar Autodesk. Vazio = generico.
 if ($null -eq $Destacar) { $Destacar = @() }
 elseif ($Destacar.Count -eq 1 -and ([string]$Destacar[0]) -match '[,;]') {
