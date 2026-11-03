@@ -1,5 +1,7 @@
 # Plano v1.4 — kit coleta inventário de software (somente leitura)
 
+> **Status (2026-11-03):** a linha 1.4 culminou na **v1.4.4** (`coleta_inventario_software_v1.4.4.ps1` / `rodar_coleta_v1.4.4.cmd` / `KIT_PENDRIVE_v1.4.4.md`). Intermediárias (v1.4–v1.4.3) saíram da árvore do repo; o plano abaixo permanece como registro histórico do escopo.
+
 **Data:** 2026-11-01 (America/Sao_Paulo)  
 **Base:** `coleta_inventario_software_v1.3.ps1`  
 **Regra:** arquivos novos `_v1.4`; versões antigas **nunca** sobrescritas.  
@@ -15,14 +17,14 @@
 | 4 | Menos falsos positivos crack/keygen | Extensões ignoradas (imagens/PDF/texturas); caminhos `site-packages`, `numpy`, `textures`, `Materials`, `Maps`; nome `crackfortran`. Coluna `Classificacao` = `FORTE` / `FRACO` / `PROVAVEL_FALSO_POSITIVO`. FP vão para `11f_indicios_provavel_fp.csv` e **não** entram na contagem de fortes do resumo. Mantém `11e_` (exclusões explícitas tipo ssh-keygen). | Falso negativo se crack real tiver nome genérico em pasta de textura — aceitável; fica em 11f para revisão. | Plantar `texture_crack.png`, `crackfortran.py` em site-packages, `documento_crack.pdf` → 11f, não em 11 fortes; `Corel_keygen.exe` continua FORTE. |
 | 5 | IDs de pasta padronizados | Normaliza `-Equip`: `1`/`EQ1`/`eq04` → `EQ01`/`EQ04` (mín. 2 dígitos). Aceita `EQ01` já correto. Inválido → `EQ_SEM_ID` + AVISO. | Cosmético. | Entradas `eq1`, `EQ1`, `4` → pastas `EQ01_*`, `EQ04_*`. |
 | 6 | Perfis externos | `-Perfil caminho.psd1` (ou `.json`) carrega: `Fabricantes`, `IndiciosFortes/Fracos`, `ExclusaoIndicios`, `Extensoes`, `PastasPrograma`, `RaizesRegistroLicenca`, `PrefetchPrefixes`, `VendorGuess`, `DestacarPadrao`. Sem `-Perfil`, usa defaults embutidos **neutros** (regex genérica de indícios + fabricantes comuns de exemplo). Repo público: `perfis/exemplo_generico.psd1`. Perfil real do caso: `/workspace/pericia/...` (não versionado). | Perfil malformado aborta com código 5 antes de coletar. | Rodar com exemplo → log mostra perfil carregado; sem perfil → defaults. |
-| 7 | Checklist capturas manuais | `KIT_PENDRIVE_v1.4.md` + seção no `00_RESUMO` “CAPTURAS MANUAIS PENDENTES”: Programas e Recursos / Aplicativos; tela Sobre (se autorizada); foto etiqueta EQ. | Nenhum. | Texto presente no resumo e no doc. |
+| 7 | Checklist capturas manuais | `KIT_PENDRIVE_v1.4.4.md` + seção no `00_RESUMO` “CAPTURAS MANUAIS PENDENTES”: Programas e Recursos / Aplicativos; tela Sobre (se autorizada); foto etiqueta EQ. | Nenhum. | Texto presente no resumo e no doc. |
 
-## Arquivos novos
+## Arquivos (entregue como v1.4.4)
 
-- `coleta_inventario_software_v1.4.ps1`
-- `rodar_coleta_v1.4.cmd`
-- `KIT_PENDRIVE_v1.4.md`
-- `PLANO_v1.4.md` (este)
+- `coleta_inventario_software_v1.4.4.ps1` (linha 1.4; intermediárias removidas da árvore)
+- `rodar_coleta_v1.4.4.cmd`
+- `KIT_PENDRIVE_v1.4.4.md`
+- `PLANO_v1.4.md` (este — histórico)
 - `perfis/exemplo_generico.psd1` (público)
 - `CHECKLIST_CAMPO_v1.4.md` (capturas manuais)
 - Append em `KIT_SHA256.txt`

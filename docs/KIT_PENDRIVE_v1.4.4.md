@@ -6,7 +6,7 @@ Processo sigiloso: use so identificadores **EQ01**, **EQ02** etc. Sem nomes das 
 
 - Banner ASCII cyber/HUD (80 colunas) no inicio da execucao e no topo do `00_RESUMO.txt`.
 - Fallback de copia de `NTUSER.DAT` com `FileShare.ReadWrite` quando o hive esta travado.
-- Herda v1.4.3: hives offline **ligados por padrao**; copia automatica de suspeitos; prompt se arquivo **> 500 MB**.
+- Hives offline **ligados por padrao**; copia automatica de suspeitos; prompt se arquivo **> 500 MB**.
 
 ## Estrutura do pendrive
 
@@ -45,12 +45,10 @@ Desliga com `-SemHivesOffline` ou `set KIT_HIVES=0` no lancador.
 
 ## Changelog
 
-### v1.4.4 (02/11/2026)
+### v1.4.4 (02/11/2026) — versao atual neste repositorio
 - Banner ASCII cyber/HUD (80 colunas) no inicio e no `00_RESUMO`.
 - Fallback FileShare na copia de NTUSER.DAT travado.
+- Inclui (da linha 1.4.x): hives offline ligados por padrao; copia automatica de suspeitos; prompt >500 MB; ID `EQ##`; script 100% ASCII + UTF-8 BOM.
 
-### v1.4.3 (02/11/2026)
-- Hives offline ligados por padrao; copia automatica de suspeitos; prompt >500 MB; ID EQ##.
-
-### v1.4.1 (01/11/2026)
-- Script 100% ASCII + UTF-8 BOM (corrige ParserError PS 5.1/cp1252).
+A oficial estavel anterior permanece em `KIT_PENDRIVE_v1.3.md` / `coleta_inventario_software_v1.3.ps1`.
+Intermediarias (v1.4 / 1.4.1 / 1.4.2 / 1.4.3) nao ficam mais na arvore — so no historico git.

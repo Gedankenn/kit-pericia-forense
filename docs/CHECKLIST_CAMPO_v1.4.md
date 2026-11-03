@@ -1,4 +1,4 @@
-# Checklist de campo — kit v1.4
+# Checklist de campo — kit v1.4.4
 
 Use uma folha por equipamento. Identificador sempre no formato **EQ01**, **EQ02**…
 
@@ -12,7 +12,7 @@ Use uma folha por equipamento. Identificador sempre no formato **EQ01**, **EQ02*
 ## Coleta automática
 
 - [ ] Plugar pendrive; **recusar** “verificar e corrigir”
-- [ ] Botão direito em `rodar_coleta_v1.4.cmd` → **Executar como administrador**
+- [ ] Botão direito em `rodar_coleta_v1.4.4.cmd` → **Executar como administrador**
 - [ ] Digitar o identificador (ex.: `EQ01` ou só `1` — o script normaliza)
 - [ ] Aguardar o fim; ler o `00_RESUMO.txt` na tela
 - [ ] Fotografar o quadro final (resumo + SHA-256 do manifesto)

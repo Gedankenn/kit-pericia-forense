@@ -27,7 +27,8 @@
 Roda no pendrive, grava so no pendrive, fecha com manifesto SHA-256. Sem telemetria, sem phone-home, sem nuvem.
 
 > Autor: **Fabio Slika Stella** — CREA/PR PR-224755/D  
-> Script atual: [`scripts/coleta_inventario_software_v1.4.4.ps1`](scripts/coleta_inventario_software_v1.4.4.ps1) · Lancador: [`scripts/rodar_coleta_v1.4.4.cmd`](scripts/rodar_coleta_v1.4.4.cmd)
+> Script atual: [`scripts/coleta_inventario_software_v1.4.4.ps1`](scripts/coleta_inventario_software_v1.4.4.ps1) · Lancador: [`scripts/rodar_coleta_v1.4.4.cmd`](scripts/rodar_coleta_v1.4.4.cmd)  
+> Oficial anterior (v1.3): [`scripts/coleta_inventario_software_v1.3.ps1`](scripts/coleta_inventario_software_v1.3.ps1) · [`scripts/rodar_coleta_v1.3.cmd`](scripts/rodar_coleta_v1.3.cmd)
 
 ---
 
@@ -87,16 +88,16 @@ Listas de fabricantes/indicios podem ir num `-Perfil` externo (`.psd1` / `.json`
 
 ---
 
-## Novidades v1.4.x
+## Versoes neste repositorio
 
-| Versao | Destaque |
-|--------|----------|
-| **1.4.4** | Banner ASCII cyber/HUD (80 colunas) no console e no topo do `00_RESUMO`; fallback `FileShare` na copia de `NTUSER.DAT` travado |
-| **1.4.3** | Hives offline **ligados por padrao** (admin); copia automatica de suspeitos; prompt S/N se arquivo **> 500 MB**; checagem de espaco livre |
-| **1.4.1** | Script **100% ASCII + UTF-8 BOM** (corrige `ParserError` do PS 5.1/cp1252 com em-dash); ID obrigatorio `EQ##` |
-| **1.4** | Hives via copia no pendrive; fallback Defender; hash/assinatura; menos FP (`11f_`); `-Perfil`; checklist de capturas manuais |
+So duas linhas de script ficam na arvore (intermediarias quebradas/fora de uso foram removidas; o historico git preserva tudo):
 
-Versoes antigas ficam lado a lado em `scripts/` — **nunca sobrescritas**.
+| Versao | Papel |
+|--------|-------|
+| **v1.4.4** | **Atual** — use esta em campo. Banner ASCII HUD; hives offline ON; copia automatica de suspeitos (prompt se **> 500 MB**); ASCII + UTF-8 BOM; ID `EQ##` |
+| **v1.3** | **Oficial estavel** anterior (pre-1.4) — `00_RESUMO` generico + `-Destacar`; plano B `coleta_minima_v1.2.cmd` |
+
+Arquivos novos de versao **nunca sobrescrevem** os anteriores; o que nao esta mais na arvore continua no historico do git.
 
 ---
 
@@ -167,7 +168,7 @@ VM Windows 10 Enterprise Eval, PowerShell 5.1, QEMU TCG (sem KVM), pendrive simu
 
 | Cenario | Versao | Resultado |
 |---------|--------|-----------|
-| Admin, resposta **N** ao arquivo >500 MB | 1.4.3 | OK (~4 min sob TCG); decisao `PULADO_OPERADOR_N`; FPs nao copiados; manifesto confere |
+| Admin, resposta **N** ao arquivo >500 MB | 1.4.4 | OK (~4 min sob TCG); decisao `PULADO_OPERADOR_N`; FPs nao copiados; manifesto confere |
 | Admin, resposta **S** ao arquivo >500 MB | 1.4.4 | OK; banner no console e no resumo; hive offline via copia; `COPIADO_APOS_SIM` com HashOk; unload no finally |
 | Usuario padrao (sem admin) | 1.4.4 | OK; hives desligados automaticamente; copia de suspeitos acessiveis segue |
 
@@ -201,14 +202,11 @@ Achados tipicos (genericos): regras de firewall bloqueando licenciamento; DLL de
 
 ## Changelog resumido
 
-- **v1.4.4** — Banner ASCII HUD; fallback FileShare em NTUSER travado  
-- **v1.4.3** — Hives ON por padrao; copia automatica + prompt >500 MB; `11g_`  
-- **v1.4.1** — ASCII + UTF-8 BOM; ID `EQ##` obrigatorio  
-- **v1.4** — Hives offline, Defender fallback, FP, `-Perfil`, checklist  
-- **v1.3** — `00_RESUMO` generico + `-Destacar`  
-- **v1.2** — Exclusao de indicios (ex.: SSH-KEYGEN)  
+- **v1.4.4** *(atual)* — Banner ASCII HUD; fallback FileShare em NTUSER travado; herda hives ON, copia automatica + prompt >500 MB, ASCII/BOM, `EQ##`, Defender fallback, FP, `-Perfil`  
+- **v1.3** *(oficial anterior)* — `00_RESUMO` generico + `-Destacar`  
+- **v1.2** — Exclusao de indicios (ex.: SSH-KEYGEN); plano B `coleta_minima`  
 
-Detalhes: [`docs/KIT_PENDRIVE_v1.4.4.md`](docs/KIT_PENDRIVE_v1.4.4.md)
+Detalhes atuais: [`docs/KIT_PENDRIVE_v1.4.4.md`](docs/KIT_PENDRIVE_v1.4.4.md) · Oficial anterior: [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md)
 
 ---
 

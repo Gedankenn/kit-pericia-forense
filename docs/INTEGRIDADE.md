@@ -17,6 +17,7 @@ Get-Content .\KIT_SHA256.txt | Where-Object { $_ -match '^[a-f0-9]{64}\s' } | Fo
 Ou com `certutil`:
 
 ```bat
+certutil -hashfile scripts\coleta_inventario_software_v1.4.4.ps1 SHA256
 certutil -hashfile scripts\coleta_inventario_software_v1.3.ps1 SHA256
 ```
 

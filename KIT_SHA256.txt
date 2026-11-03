@@ -1,44 +1,26 @@
-291dee8f84dee8790cb9c02e7f54848abde4f00937590f9f3d6caf3427abe19c  coleta_inventario_software_v1.2.ps1
-0e8b43fad7ad1e6822babaf8121955986f033f298a9216d136af88636c81cced  rodar_coleta_v1.2.cmd
-33dbde2bdac86560d984d6f2d9a8c6bc6355e90f6037972cfd1606075eed8930  coleta_minima_v1.2.cmd
-fedaf0f1eea4a47bcd57e366ee7029c92f1c5d0d817e98a8fcc274a681224f64  capturar_tela.cmd
-d1bca99f60aafdbb2c484db217fb4d28378306159e9e2ed35e0f70e98e204c1c  capturar_tela.ps1
-8d9a3a1c21d4f9b64a5ba9099dc5e6a153533c30500a0c07295bd138a3b91a6f  KIT_PENDRIVE_v1.2.md
-170f32ead99db9ceea4e1b6ba743b7a72a7a3b32fbb843a0350f73dcf4f9245d  coleta_inventario_software_v1.1.ps1
-d1761604b57cfee8593753625e750b2a8ddc79096903867d881125b1901aedf4  rodar_coleta.cmd
-575b92bba0df5cffad3e701df2a3b6f7f298e58646bfbc213c220ed7e8fd32c4  coleta_minima.cmd
-9025dfff253368d969adc262e4ad68d0ebff29a84f9364aaf32ee18fff107151  KIT_PENDRIVE_v1.1.md
-77d768316e4d7280468848882e75e002997d5cc88afd6ec0b4339bd16377555b  coleta_inventario_software.ps1
+# Hashes SHA-256 dos arquivos do kit presentes neste repositorio.
+# Intermediarias (v1.4, v1.4.1, v1.4.2, v1.4.3) foram removidas da arvore;
+# permanecem no historico git. Conferencia: sha256sum -c KIT_SHA256.txt --ignore-missing
+# (nomes sao basenames — rode a partir da pasta do kit no pendrive).
 
-# --- v1.3 2026-10-28 11:24 America/Sao_Paulo (resumo generico + -Destacar) ---
-3c8073b4ffe52ef6e8ce702ea6c40d1fbd21673eb9b08a841e1f96455dbc4ac3  coleta_inventario_software_v1.3.ps1
+# --- v1.3 2026-10-28 America/Sao_Paulo (oficial estavel pre-1.4; resumo generico + -Destacar) ---
+83e04ecbe2fe573c64d0c84d9dcdac5d00ae11ebbaf3c95c627d468637c75df7  coleta_inventario_software_v1.3.ps1
 1f1c13b3511f5db469751c201f04dc35cf48ef8ea5333a21745cac20448ae82b  rodar_coleta_v1.3.cmd
-3934bba52254953ddc45db9825e9ec1a1aa02f02520e9cbe7fd7be535b94d0d6  KIT_PENDRIVE_v1.3.md
+47792d73d6ff5248dd3b75d733f1d793316da5534dc46be342062047a57d2e0b  KIT_PENDRIVE_v1.3.md
 
-# --- v1.4 2026-11-01 America/Sao_Paulo (hives offline, defender fallback, FP, perfil, EQ##) ---
-67548057667fc3c820b4655b13174c14404179f7570f94c7e9d37141ac692a72  coleta_inventario_software_v1.4.ps1
-4d0810f39bb3e1a0b6398cdb95ceddeade8fcd06de4757ea5887d845e6e73b17  rodar_coleta_v1.4.cmd
-66d91a1dc10c3013ae5da2253973477475e697077bbd46bf1ba6b3fe1a92c1f4  KIT_PENDRIVE_v1.4.md
-da93724f58b9d5ecbb19bc3e2495fb6cfd6f32499f441880b77a609e0b61fed5  CHECKLIST_CAMPO_v1.4.md
-da5e2a90d0d31d12794ba3c9eb4cf575e38295a887525dccccfd4d7b4d698abf  PLANO_v1.4.md
-3bc897b0cfb357eb09d2dc2f9767c96d72a8fe0d5b07ce207b63cbfc590bfdec  perfis/exemplo_generico.psd1
+# --- plano B / utilitarios ---
+33dbde2bdac86560d984d6f2d9a8c6bc6355e90f6037972cfd1606075eed8930  coleta_minima_v1.2.cmd
+b86679eda1aeabf290d4437d5dd66c7b3607e3a09b3247d877a21edc1e6a8a71  capturar_tela.cmd
+29254a2d84dfc06da5462c35eb8203cabb05db21189b9f8620bf9854348aa95a  capturar_tela.ps1
 
-# --- v1.4.1 ---
-62205da8c5baff2aef1193f29bdeb5557f3334ae91da92abaaeb731ac940cdaf  coleta_inventario_software_v1.4.1.ps1
-fad59769eef20f2e3c8e4fcae62923a64594910377eb5620b608b57023b70622  rodar_coleta_v1.4.1.cmd
-38c649f6c017a878b979bd44a58cfe5eeaf39d7302f054105c49ef26ada0e0cc  KIT_PENDRIVE_v1.4.1.md
-
-# --- v1.4.2 ---
-d92c21bab002f9c6b92a051052f2edbbdffe0ff9dd2d7fed5310c0f8fa7b5156  coleta_inventario_software_v1.4.2.ps1
-1a3d0297a7c458d828681175b41b39829ac06140c5008b48aa1e9db5e5b8034b  rodar_coleta_v1.4.2.cmd
-2d8eb16ffdd30fa20b983bb826258bb2d83ff043ac0cef2dc2dbde8aebbefb8f  KIT_PENDRIVE_v1.4.2.md
-
-# --- v1.4.3 2026-11-02 America/Sao_Paulo (hives ON default, auto-copy suspeitos, >500MB prompt) ---
-cdc105ad3384be3910d3071425c4c5d5eed602c6f4497038bb4e137d7c295190  coleta_inventario_software_v1.4.3.ps1
-5f3d8a80bc7fdb92d577b890b5c939e2139964ada3a33224b8f1f4ca1c976f33  rodar_coleta_v1.4.3.cmd
-c7f23295ffff624bb157ea5405b30d3cefd7b9dade43e6c948c0ffa678d13e89  KIT_PENDRIVE_v1.4.3.md
-
-# --- v1.4.4 2026-11-02 America/Sao_Paulo (banner ASCII + hive FileShare fallback) ---
+# --- v1.4.4 2026-11-02 America/Sao_Paulo (atual; banner ASCII + hive FileShare fallback) ---
 687bf759a2ba71700ac690cbf303a30c7c7f3bb48953485813cf4360a0d35e9f  coleta_inventario_software_v1.4.4.ps1
 2a59559ccf70d6308570999828fd003c187ab02203ba4fab6d60a7f43da64a77  rodar_coleta_v1.4.4.cmd
-26281f714072a2d4f99cc8ffb6e96b42153eb98a2eed5b898d9c089f9209b5d6  KIT_PENDRIVE_v1.4.4.md
+fc26e3018abe927b3af4c129124c8671f63836cbc368012484b8b689ab030bb2  KIT_PENDRIVE_v1.4.4.md
+
+# --- docs / perfil de exemplo (linha 1.4) ---
+ac79f97d74273868fb30bf571ae8332bcbd2444487fce9202184b28b645252c8  CHECKLIST_CAMPO_v1.4.md
+b5cce57a765d295ad230c94d020f682902bc7dbe4ff9687ba8f047f6b88232af  PLANO_v1.4.md
+23152754f2b65c68f44523d86c2a3e586a3b833d95fc2507ba09e486c0b18f7c  INTEGRIDADE.md
+3bc897b0cfb357eb09d2dc2f9767c96d72a8fe0d5b07ce207b63cbfc590bfdec  exemplo_generico.psd1
+
