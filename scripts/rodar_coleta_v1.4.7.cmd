@@ -1,15 +1,15 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 REM ==========================================================================
-REM  rodar_coleta_v1.4.6.cmd - lancador da coleta v1.4.6 (pericia, SOMENTE LEITURA)
+REM  rodar_coleta_v1.4.7.cmd - lancador da coleta v1.4.7 (pericia, SOMENTE LEITURA)
 REM  Uso: clicar com o botao direito > "Executar como administrador".
 REM  Tudo e gravado no proprio pendrive (pasta coleta\ ao lado deste arquivo).
-REM  v1.4.6: menos FP servicos; copia hive sessao ativa; filtra SEM_EVENTOS/Public;
+REM  v1.4.7: menos FP servicos; copia hive sessao ativa; filtra SEM_EVENTOS/Public;
 REM          herda EQ## batch puro (aceita eq01); hives offline ON; copia suspeitos >500MB.
 REM  v1.4.5: EQ## validado em batch puro (sem PowerShell inline); aceita eq01.
 REM ==========================================================================
 set "KIT=%~dp0"
-set "SCRIPT=%KIT%coleta_inventario_software_v1.4.6.ps1"
+set "SCRIPT=%KIT%coleta_inventario_software_v1.4.7.ps1"
 set "PERFIL=%KIT%perfis\exemplo_generico.psd1"
 
 set "PSEXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -107,6 +107,11 @@ goto ask_eq
 set "EQ=!EQOK!"
 echo Usando identificador: !EQ!
 
+set "OP="
+set /p "OP=Nome do operador/perito (Enter=NAO_INFORMADO): "
+if not defined OP set "OP=NAO_INFORMADO"
+set "KIT_OPERADOR=!OP!"
+
 REM Hives offline: LIGADO por padrao (v1.4.4+). Para desligar: set KIT_HIVES=0
 set "HIVESARG="
 if /I "%KIT_HIVES%"=="0" set "HIVESARG=-SemHivesOffline"
@@ -117,14 +122,14 @@ if /I "%KIT_COPIA_GRANDE%"=="S" set "GRANDEARG=-RespostaCopiaGrande S"
 if /I "%KIT_COPIA_GRANDE%"=="N" set "GRANDEARG=-RespostaCopiaGrande N"
 
 if exist "%PERFIL%" (
-  "%PSEXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%SCRIPT%" -Equip "!EQ!" -CapturaTela -Perfil "%PERFIL%" %HIVESARG% %GRANDEARG%
+  "%PSEXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%SCRIPT%" -Equip "!EQ!" -Operador "!OP!" -CapturaTela -Perfil "%PERFIL%" %HIVESARG% %GRANDEARG%
 ) else (
-  "%PSEXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%SCRIPT%" -Equip "!EQ!" -CapturaTela %HIVESARG% %GRANDEARG%
+  "%PSEXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%SCRIPT%" -Equip "!EQ!" -Operador "!OP!" -CapturaTela %HIVESARG% %GRANDEARG%
 )
 set "RC=%ERRORLEVEL%"
 echo.
 echo Codigo de saida: %RC%  (0 = ok; 2 = destino recusado; 3/4 = erro de pasta; 5 = perfil; 6 = ID invalido)
 echo Fotografe a tela com o RESUMO e o hash do manifesto antes de fechar.
-echo Checklist: capturas manuais de Programas e Recursos / Sobre (ver KIT_PENDRIVE_v1.4.6.md).
+echo Checklist: capturas manuais de Programas e Recursos / Sobre (ver KIT_PENDRIVE_v1.4.7.md)..
 pause
 endlocal

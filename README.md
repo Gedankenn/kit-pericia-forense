@@ -8,7 +8,7 @@
 |  | . \  | |  | |   |  __/| |___|  _ < | | |___ | | / ___ \                   |
 |  |_|\_\|___| |_|   |_|   |_____|_| \_\___\____|___/_/   \_\                  |
 |  __________________________________________________________________________  |
-|  | Coleta de inventario de software  |  PowerShell 5.1  |  v1.4.6          | |
+|  | Coleta de inventario de software  |  PowerShell 5.1  |  v1.4.7          | |
 |  | Somente leitura na maquina        |  Saida no pendrive |  EQ##          | |
 |  |____[ SHA-256 manifesto ]__________|__[ sem telemetria ]|________________| |
 +------------------------------------------------------------------------------+
@@ -16,7 +16,7 @@
 
 # Kit Pericia Forense
 
-![versao](https://img.shields.io/badge/versao-v1.4.6-FFB000?style=flat-square&labelColor=1a1200)
+![versao](https://img.shields.io/badge/versao-v1.4.7-FFB000?style=flat-square&labelColor=1a1200)
 ![ps](https://img.shields.io/badge/PowerShell-5.1-4472C4?style=flat-square&labelColor=1a1200)
 ![win](https://img.shields.io/badge/Windows-10%20%2F%2011-00A4EF?style=flat-square&labelColor=1a1200)
 ![licenca](https://img.shields.io/badge/licenca-MIT-22c55e?style=flat-square&labelColor=1a1200)
@@ -27,7 +27,7 @@
 Roda no pendrive, grava so no pendrive, fecha com manifesto SHA-256. Sem telemetria, sem phone-home, sem nuvem.
 
 > Autor: **Fabio Slika Stella** — CREA/PR PR-224755/D  
-> Script atual: [`scripts/coleta_inventario_software_v1.4.6.ps1`](scripts/coleta_inventario_software_v1.4.6.ps1) · Lancador: [`scripts/rodar_coleta_v1.4.6.cmd`](scripts/rodar_coleta_v1.4.6.cmd)  
+> Script atual: [`scripts/coleta_inventario_software_v1.4.7.ps1`](scripts/coleta_inventario_software_v1.4.7.ps1) · Lancador: [`scripts/rodar_coleta_v1.4.7.cmd`](scripts/rodar_coleta_v1.4.7.cmd)  
 > Oficial anterior (v1.3): [`scripts/coleta_inventario_software_v1.3.ps1`](scripts/coleta_inventario_software_v1.3.ps1) · [`scripts/rodar_coleta_v1.3.cmd`](scripts/rodar_coleta_v1.3.cmd)
 
 ---
@@ -94,7 +94,7 @@ So duas linhas de script ficam na arvore (intermediarias quebradas/fora de uso f
 
 | Versao | Papel |
 |--------|-------|
-| **v1.4.6** | **Atual** — use esta em campo. Menos FP de servicos; hive da sessao ativa no pendrive (`COPIADO_SESSAO_ATIVA` via FileShare/`reg save`); avisos SEM_EVENTOS/Public filtrados; EQ## batch puro; hives ON; copia automatica + prompt **> 500 MB**; ASCII + UTF-8 BOM |
+| **v1.4.7** | **Atual** — use esta em campo. Menos FP de servicos; hive da sessao ativa no pendrive (`COPIADO_SESSAO_ATIVA` via FileShare/`reg save`); avisos SEM_EVENTOS/Public filtrados; EQ## batch puro; hives ON; copia automatica + prompt **> 500 MB**; ASCII + UTF-8 BOM |
 | **v1.3** | **Oficial estavel** anterior (pre-1.4) — `00_RESUMO` generico + `-Destacar`; plano B `coleta_minima_v1.2.cmd` |
 
 Arquivos novos de versao **nunca sobrescrevem** os anteriores; o que nao esta mais na arvore continua no historico do git.
@@ -104,11 +104,11 @@ Arquivos novos de versao **nunca sobrescrevem** os anteriores; o que nao esta ma
 ## Uso rapido (pendrive)
 
 1. Copie para a raiz do pendrive:
-   - `scripts/coleta_inventario_software_v1.4.6.ps1`
-   - `scripts/rodar_coleta_v1.4.6.cmd`
+   - `scripts/coleta_inventario_software_v1.4.7.ps1`
+   - `scripts/rodar_coleta_v1.4.7.cmd`
    - `perfis/exemplo_generico.psd1` (opcional)
    - `KIT_SHA256.txt` + docs do pendrive (opcional)
-2. No PC vistoriado: botao direito em `rodar_coleta_v1.4.6.cmd` → **Executar como administrador**.
+2. No PC vistoriado: botao direito em `rodar_coleta_v1.4.7.cmd` → **Executar como administrador**.
 3. Informe o ID (`EQ01` ou so `1`). Texto livre e **rejeitado** (codigo de saida `6`).
 4. Se aparecer arquivo **> 500 MB**, responda `S` ou `N` (a decisao vai para `11g_copias_suspeitos.csv`).
 5. Fotografe o resumo + hash do manifesto; siga o checklist de capturas manuais.
@@ -158,7 +158,7 @@ Conferir o kit no pendrive:
 sha256sum -c KIT_SHA256.txt --ignore-missing
 ```
 
-Hashes oficiais: [`KIT_SHA256.txt`](KIT_SHA256.txt) · Guia do pendrive: [`docs/KIT_PENDRIVE_v1.4.6.md`](docs/KIT_PENDRIVE_v1.4.6.md) · Exemplo de resumo: [`exemplos/exemplo_00_RESUMO_v1.4.6.txt`](exemplos/exemplo_00_RESUMO_v1.4.6.txt)
+Hashes oficiais: [`KIT_SHA256.txt`](KIT_SHA256.txt) · Guia do pendrive: [`docs/KIT_PENDRIVE_v1.4.7.md`](docs/KIT_PENDRIVE_v1.4.7.md) · Exemplo de resumo: [`exemplos/exemplo_00_RESUMO_v1.4.6.txt`](exemplos/exemplo_00_RESUMO_v1.4.6.txt)
 
 ---
 
@@ -168,9 +168,9 @@ VM Windows 10 Enterprise Eval, PowerShell 5.1, QEMU TCG (sem KVM), pendrive simu
 
 | Cenario | Versao | Resultado |
 |---------|--------|-----------|
-| Admin, `-RespostaCopiaGrande N`, fixtures de crack | 1.4.6 | OK (~133 s TCG); manifesto 72/72; `COPIADO_SESSAO_ATIVA` (reg save); 0 servicos FP; 7 fortes / 7 copias; mega>500MB `PULADO_OPERADOR_N` |
-| Lancador `eq01` (minusculas) | 1.4.6 | OK; normalizou para `EQ01` |
-| Usuario padrao (sem admin) | 1.4.6 | OK (~209 s); manifesto 49/49; hives desligados; 4 fortes / 5 copias |
+| Admin, `-RespostaCopiaGrande N`, fixtures de crack | 1.4.7 | OK (~133 s TCG); manifesto 72/72; `COPIADO_SESSAO_ATIVA` (reg save); 0 servicos FP; 7 fortes / 7 copias; mega>500MB `PULADO_OPERADOR_N` |
+| Lancador `eq01` (minusculas) | 1.4.7 | OK; normalizou para `EQ01` |
+| Usuario padrao (sem admin) | 1.4.7 | OK (~209 s); manifesto 49/49; hives desligados; 4 fortes / 5 copias |
 | Admin `eq01` | 1.4.5 | OK; normalizou EQ01; ~146 s; manifesto confere |
 | Admin N/S >500 MB; usuario | 1.4.4 | OK; banner/hives/copia suspeitos conforme esperado |
 
@@ -194,8 +194,8 @@ Achados tipicos (genericos): regras de firewall bloqueando licenciamento; DLL de
 
 ## Roadmap
 
-- [x] Hive da sessao ativa no pendrive (v1.4.6: FileShare / `reg save`)
-- [x] Menos FP de servicos Windows vs Autodesk (v1.4.6)
+- [x] Hive da sessao ativa no pendrive (v1.4.7: FileShare / `reg save`)
+- [x] Menos FP de servicos Windows vs Autodesk (v1.4.7)
 - [ ] Menos FP no matcher de nomes (alem de `11f_`)
 - [ ] Hash/assinatura automaticos ja feitos na 1.4 — expandir candidatos
 - [ ] Teste ponta a ponta: usuario no console fisico; AppLocker; AV corporativo
@@ -205,12 +205,12 @@ Achados tipicos (genericos): regras de firewall bloqueando licenciamento; DLL de
 
 ## Changelog resumido
 
-- **v1.4.6** *(atual)* — Menos FP de servicos (`\bInventor\b`, sem `|Licens` generico, ignora InventorySvc/LicenseManager); filtra SEM_EVENTOS/Public; perfis especiais silenciosos; hive da sessao ativa no pendrive (`COPIADO_SESSAO_ATIVA` via FileShare ou `reg save`); herda EQ## batch, hives ON, copia suspeitos, ASCII/BOM  
+- **v1.4.7** *(atual)* — Menos FP de servicos (`\bInventor\b`, sem `|Licens` generico, ignora InventorySvc/LicenseManager); filtra SEM_EVENTOS/Public; perfis especiais silenciosos; hive da sessao ativa no pendrive (`COPIADO_SESSAO_ATIVA` via FileShare ou `reg save`); herda EQ## batch, hives ON, copia suspeitos, ASCII/BOM  
 - **v1.4.5** — Lancador `.cmd` sem PowerShell inline (`eq01` -> `EQ01`)  
 - **v1.3** *(oficial anterior)* — `00_RESUMO` generico + `-Destacar`  
 - **v1.2** — Exclusao de indicios (ex.: SSH-KEYGEN); plano B `coleta_minima`  
 
-Detalhes atuais: [`docs/KIT_PENDRIVE_v1.4.6.md`](docs/KIT_PENDRIVE_v1.4.6.md) · Oficial anterior: [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md)
+Detalhes atuais: [`docs/KIT_PENDRIVE_v1.4.7.md`](docs/KIT_PENDRIVE_v1.4.7.md) · Oficial anterior: [`docs/KIT_PENDRIVE_v1.3.md`](docs/KIT_PENDRIVE_v1.3.md)
 
 ## Licenca e autor
 

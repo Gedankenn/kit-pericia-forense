@@ -1,7 +1,15 @@
 ﻿<#
-  coleta_inventario_software_v1.4.6.ps1 - Pericia judicial (vistoria de software)
+  coleta_inventario_software_v1.4.7.ps1 - Pericia judicial (vistoria de software)
   Perito: Fabio Slika Stella - CREA/PR PR-224755/D
-  Versao 1.4.6 (03/11/2026) - baseada na v1.4.5 (originais preservados ao lado)
+  Versao 1.4.7 (04/11/2026) - baseada na v1.4.6 (originais preservados ao lado)
+  v1.4.7: manifesto+INDICE sempre (try/finally); nao lista copia falha no manifesto;
+        copia .lic/.dat NLM/FlexLM (registro, env, pastas FLEXnet/NLM, licpath.lic);
+        relogio inicio/fim + w32tm status/stripchart (somente leitura);
+        SHA-256 de binarios em regras de firewall e exclusoes Defender (quando arquivo);
+        Prefetch: ultima(s) execucao(oes) + contagem (v17/23/26/30; MAM via ntdll);
+        NTUSER/UsrClass de TODOS os perfis (FileShare/reg save/VSS fallback);
+        ordem de coleta com timestamps + nome do operador; captura de tela final;
+        menos FP: AdskRcDispatch, AsmPreloader, Dynamo *.Patch.dyn / CloseCracks.dyn.
   v1.4.6: menos FP de servicos (Inventor/InventorySvc, LicenseManager);
         avisos de SEM_EVENTOS / Public AppData nao contam como erro;
         perfis Public/Default/Default User silenciosos em Recent/AppData/aviso hive;
@@ -31,9 +39,9 @@
     (por padrao <pasta do script>\coleta). Ao final gera manifesto SHA-256 de todos os
     arquivos produzidos.
 
-  COMO USAR (recomendado: pelo lancador rodar_coleta_v1.4.6.cmd, clicando com o botao direito
+  COMO USAR (recomendado: pelo lancador rodar_coleta_v1.4.7.cmd, clicando com o botao direito
   em "Executar como administrador"). Linha de comando equivalente:
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.6.ps1 -Equip EQ01 -CapturaTela
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.7.ps1 -Equip EQ01 -CapturaTela
 
   PARAMETROS PRINCIPAIS
     -Equip                 identificador EQ## (aceita 1/EQ1/EQ01; rejeita texto livre; codigo 6 se invalido)
@@ -50,6 +58,7 @@
     -ResolverAtalhos       le o destino dos atalhos .lnk da pasta Recent
     -MRUCompleto           lista TODOS os itens recentes (padrao: so os relacionados)
     -Destacar              (opcional) fabricantes a DESTACAR no topo do resumo. Nunca oculta o resto.
+    -Operador              nome do perito/operador (gravado no log e na ordem de coleta)
     -ModoTeste             permite gravar no disco do sistema (SO PARA TESTE NO PC DO PERITO)
 
   OBS. TECNICAS
@@ -104,6 +113,7 @@ param(
   [switch]$ResolverAtalhos,
   [switch]$MRUCompleto,
   [string[]]$Destacar = @(),
+  [string]$Operador = '',
   [switch]$ModoTeste
 )
 
@@ -131,7 +141,7 @@ if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProces
 $ErrorActionPreference = 'SilentlyContinue'   # erros sao contados e registrados no log por secao
 $env:PSModuleAnalysisCachePath = 'NUL'         # nao gravar cache de modulos no perfil da maquina vistoriada (v1.1 testes em VM)
 $ProgressPreference    = 'SilentlyContinue'
-$VersaoScript = '1.4.6'
+$VersaoScript = '1.4.7'
 # -Destacar opcional: Corel,Autodesk ou varios -Destacar Corel -Destacar Autodesk. Vazio = generico.
 if ($null -eq $Destacar) { $Destacar = @() }
 elseif ($Destacar.Count -eq 1 -and ([string]$Destacar[0]) -match '[,;]') {
@@ -309,6 +319,357 @@ function Copy-ArquivoCompartilhado {
   }
 }
 
+# --- v1.4.7: helpers (relogio, prefetch MAM, VSS, manifesto seguro) ---
+$script:OrdemColeta = New-Object System.Collections.ArrayList
+$script:FalhasCopia = New-Object System.Collections.ArrayList
+$script:RelogioInicio = $null
+$script:RelogioFim = $null
+$script:OperadorNome = ''
+$script:PrefetchNativoPronto = $false
+$script:KitTmp = $null
+
+function Register-OrdemColeta {
+  param([string]$Etapa, [string]$Detalhe = '')
+  $agora = Get-Date
+  [void]$script:OrdemColeta.Add([pscustomobject]@{
+    Seq = $script:OrdemColeta.Count + 1
+    HoraLocal = $agora.ToString('yyyy-MM-dd HH:mm:ss')
+    HoraUTC = $agora.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
+    Operador = $script:OperadorNome
+    Etapa = $Etapa
+    Detalhe = $Detalhe
+  })
+}
+
+function Get-W32tmStatusTexto {
+  $out = ''
+  try { $out = (& "$env:SystemRoot\System32\w32tm.exe" /query /status 2>&1 | Out-String) } catch { $out = ('ERRO: ' + $_.Exception.Message) }
+  return ($out -replace '\r\n', "`n").Trim()
+}
+
+function Get-W32tmOffsetMs {
+  # Somente leitura: stripchart com 1 amostra contra o peer configurado (ou time.windows.com).
+  # NUNCA chama /resync.
+  $peer = 'time.windows.com'
+  try {
+    $cfg = (& "$env:SystemRoot\System32\w32tm.exe" /query /configuration 2>&1 | Out-String)
+    if ($cfg -match '(?im)NtpServer:\s*(\S+)') {
+      $peer = ($Matches[1] -split '[, ]+')[0]
+      $peer = ($peer -replace ',0x[0-9A-Fa-f]+$', '')
+    }
+  } catch { }
+  if ([string]::IsNullOrWhiteSpace($peer)) { $peer = 'time.windows.com' }
+  $txt = ''
+  try { $txt = (& "$env:SystemRoot\System32\w32tm.exe" /stripchart /computer:$peer /samples:1 /dataonly 2>&1 | Out-String) } catch { $txt = $_.Exception.Message }
+  $offset = ''
+  if ($txt -match '([+-][0-9]+(?:\.[0-9]+)?s)') { $offset = $Matches[1] }
+  return [pscustomobject]@{ Peer = $peer; Offset = $offset; Bruto = ($txt -replace '\s+', ' ').Trim().Substring(0, [math]::Min(500, (($txt -replace '\s+', ' ').Trim()).Length)) }
+}
+
+function Capture-EstadoRelogio {
+  param([string]$Momento) # INICIO | FIM
+  $tz = [System.TimeZoneInfo]::Local
+  $agora = Get-Date
+  $status = Get-W32tmStatusTexto
+  $off = Get-W32tmOffsetMs
+  $lastSync = ''
+  if ($status -match '(?im)Last\s+Successful\s+Sync\s+Time(?:\s+From\s+Clock)?:\s*(.+)$') { $lastSync = $Matches[1].Trim() }
+  elseif ($status -match '(?im)Ultima.+sincroniza[^:]*:\s*(.+)$') { $lastSync = $Matches[1].Trim() }
+  $src = ''
+  if ($status -match '(?im)Source:\s*(.+)$') { $src = $Matches[1].Trim() }
+  elseif ($status -match '(?im)Fonte:\s*(.+)$') { $src = $Matches[1].Trim() }
+  $obj = [pscustomobject]@{
+    Momento = $Momento
+    HoraLocal = $agora.ToString('yyyy-MM-dd HH:mm:ss.fff')
+    HoraUTC = $agora.ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss.fff')
+    FusoId = $tz.Id
+    FusoDisplay = $tz.DisplayName
+    OffsetUTC = [string]$tz.GetUtcOffset($agora)
+    W32tmSource = $src
+    W32tmLastSync = $lastSync
+    W32tmPeerProbe = $off.Peer
+    W32tmOffset = $off.Offset
+    W32tmStatusBruto = ($status -replace '\s+', ' ').Trim().Substring(0, [math]::Min(1500, (($status -replace '\s+', ' ').Trim()).Length))
+    W32tmStripchartBruto = $off.Bruto
+  }
+  if ($Momento -eq 'INICIO') { $script:RelogioInicio = $obj } else { $script:RelogioFim = $obj }
+  return $obj
+}
+
+function Ensure-KitTmp {
+  if ($script:KitTmp -and (Test-Path -LiteralPath $script:KitTmp)) { return $script:KitTmp }
+  $script:KitTmp = Join-Path $script:Out '_kit_tmp'
+  [void][System.IO.Directory]::CreateDirectory($script:KitTmp)
+  return $script:KitTmp
+}
+
+function Initialize-PrefetchNativo {
+  if ($script:PrefetchNativoPronto) { return $true }
+  $tmp = Ensure-KitTmp
+  $oldTemp = $env:TEMP; $oldTmp = $env:TMP
+  $env:TEMP = $tmp; $env:TMP = $tmp
+  try {
+    $code = @'
+using System;
+using System.Runtime.InteropServices;
+public static class KitPrefetchNative {
+  [DllImport("ntdll.dll")]
+  public static extern int RtlDecompressBufferEx(
+    ushort CompressionFormat,
+    byte[] UncompressedBuffer,
+    int UncompressedBufferSize,
+    byte[] CompressedBuffer,
+    int CompressedBufferSize,
+    out int FinalUncompressedSize,
+    IntPtr WorkSpace);
+  [DllImport("ntdll.dll")]
+  public static extern int RtlGetCompressionWorkSpaceSize(
+    ushort CompressionFormat,
+    out uint CompressBufferWorkSpaceSize,
+    out uint CompressFragmentWorkSpaceSize);
+  public const ushort COMPRESSION_FORMAT_XPRESS_HUFF = 4;
+  public static byte[] DecompressMam(byte[] data) {
+    if (data == null || data.Length < 8) throw new ArgumentException("buffer curto");
+    if (data[0] != (byte)'M' || data[1] != (byte)'A' || data[2] != (byte)'M' || data[3] != 4)
+      throw new ArgumentException("nao e MAM\\x04");
+    int unclen = BitConverter.ToInt32(data, 4);
+    if (unclen <= 0 || unclen > 64 * 1024 * 1024) throw new ArgumentException("tamanho invalido");
+    byte[] comp = new byte[data.Length - 8];
+    Buffer.BlockCopy(data, 8, comp, 0, comp.Length);
+    uint ws1, ws2;
+    int st = RtlGetCompressionWorkSpaceSize(COMPRESSION_FORMAT_XPRESS_HUFF, out ws1, out ws2);
+    if (st != 0) throw new InvalidOperationException("RtlGetCompressionWorkSpaceSize 0x" + st.ToString("X"));
+    IntPtr work = Marshal.AllocHGlobal((int)ws1);
+    try {
+      byte[] dst = new byte[unclen];
+      int final;
+      st = RtlDecompressBufferEx(COMPRESSION_FORMAT_XPRESS_HUFF, dst, dst.Length, comp, comp.Length, out final, work);
+      if (st != 0) throw new InvalidOperationException("RtlDecompressBufferEx 0x" + st.ToString("X"));
+      if (final != unclen) {
+        byte[] slim = new byte[final];
+        Buffer.BlockCopy(dst, 0, slim, 0, final);
+        return slim;
+      }
+      return dst;
+    } finally { Marshal.FreeHGlobal(work); }
+  }
+}
+'@
+    Add-Type -TypeDefinition $code -Language CSharp -ErrorAction Stop | Out-Null
+    $script:PrefetchNativoPronto = $true
+    return $true
+  } catch {
+    Write-Registro ("  Prefetch nativo indisponivel: {0}" -f $_.Exception.Message) 'AVISO'
+    return $false
+  } finally {
+    $env:TEMP = $oldTemp; $env:TMP = $oldTmp
+  }
+}
+
+function Get-PrefetchBytes([string]$Caminho) {
+  $b = [System.IO.File]::ReadAllBytes($Caminho)
+  if ($b.Length -ge 4 -and $b[0] -eq 0x4D -and $b[1] -eq 0x41 -and $b[2] -eq 0x4D -and $b[3] -eq 4) {
+    if (-not (Initialize-PrefetchNativo)) { return $null }
+    return [KitPrefetchNative]::DecompressMam($b)
+  }
+  return $b
+}
+
+function Read-PrefetchInfo([string]$Caminho) {
+  $res = [pscustomobject]@{
+    Ok = $false; Versao = 0; RunCount = ''; UltimasExecucoes = ''; NomeExeInterno = ''; Erro = ''
+  }
+  try {
+    $b = Get-PrefetchBytes $Caminho
+    if ($null -eq $b -or $b.Length -lt 0x90) { $res.Erro = 'buffer_indisponivel'; return $res }
+    # assinatura SCCA em 4
+    if ($b.Length -lt 8 -or $b[4] -ne 0x53 -or $b[5] -ne 0x43 -or $b[6] -ne 0x43 -or $b[7] -ne 0x41) {
+      $res.Erro = 'assinatura_nao_SCCA'; return $res
+    }
+    $ver = [BitConverter]::ToInt32($b, 0)
+    $res.Versao = $ver
+    $nome = ''
+    try {
+      $nome = [System.Text.Encoding]::Unicode.GetString($b, 0x10, 60)
+      $zi = $nome.IndexOf([char]0); if ($zi -ge 0) { $nome = $nome.Substring(0, $zi) }
+    } catch { }
+    $res.NomeExeInterno = $nome
+    $runOff = 0; $timeOff = 0x80; $nTimes = 1
+    switch ($ver) {
+      17 { $runOff = 0x98; $nTimes = 1 }
+      23 { $runOff = 0xD0; $nTimes = 8 }
+      26 { $runOff = 0xD0; $nTimes = 8 }
+      30 { $runOff = 0xC8; $nTimes = 8 }  # v30 (Win10 1903+): RunCount em 0xC8 (0xD0 costuma ser 0)
+      default {
+        if ($ver -ge 30) { $runOff = 0xC8; $nTimes = 8 }
+        elseif ($ver -ge 23) { $runOff = 0xD0; $nTimes = 8 }
+        else { $runOff = 0x98; $nTimes = 1 }
+      }
+    }
+    if ($runOff -gt 0 -and ($runOff + 4) -le $b.Length) {
+      $res.RunCount = [string][BitConverter]::ToInt32($b, $runOff)
+    }
+    $times = New-Object System.Collections.ArrayList
+    for ($i = 0; $i -lt $nTimes; $i++) {
+      $off = $timeOff + (8 * $i)
+      if (($off + 8) -gt $b.Length) { break }
+      $ft = [BitConverter]::ToInt64($b, $off)
+      if ($ft -le 0) { continue }
+      try {
+        $dt = [DateTime]::FromFileTimeUtc($ft)
+        [void]$times.Add($dt.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss'))
+      } catch { }
+    }
+    $res.UltimasExecucoes = ($times -join ' | ')
+    $res.Ok = $true
+  } catch {
+    $res.Erro = ($_.Exception.Message -replace '\s+', ' ')
+  }
+  return $res
+}
+
+function Try-CopyViaVss {
+  param([string]$Origem, [string]$Destino)
+  # Ultimo recurso: cria shadow temporario, copia, remove shadow. Documenta no log (nao e estritamente passivo).
+  if (-not $script:IsAdmin) { throw 'VSS requer administrador' }
+  $drive = [System.IO.Path]::GetPathRoot($Origem).TrimEnd('\')
+  if (-not $drive) { throw 'sem letra de unidade' }
+  $letter = $drive.Substring(0,1)
+  $shadowId = $null
+  $shadowPath = $null
+  try {
+    $out = & wmic.exe shadowcopy call create Volume="$drive\" 2>&1 | Out-String
+    if ($out -match 'ShadowID\s*=\s*"(\{[^"]+\})"') { $shadowId = $Matches[1] }
+    if (-not $shadowId) { throw ('wmic shadowcopy falhou: ' + ($out -replace '\s+', ' ').Trim().Substring(0, [math]::Min(200, ($out -replace '\s+', ' ').Trim().Length))) }
+    $q = & vssadmin.exe list shadows /shadow="$shadowId" 2>&1 | Out-String
+    if ($q -match 'Shadow Copy Volume:\s*(\S+)') { $shadowPath = $Matches[1].Trim() }
+    if (-not $shadowPath) { throw 'nao obteve caminho do shadow' }
+    $rel = $Origem.Substring(2) # drop C:
+    if ($shadowPath.EndsWith('\')) { $srcShadow = $shadowPath.TrimEnd('\') + $rel }
+    else { $srcShadow = $shadowPath + $rel }
+    # Device path \\?\GLOBALROOT\... precisa de prefixo
+    if ($srcShadow -match '^\\\\\?\\') { $full = $srcShadow }
+    else { $full = $srcShadow }
+    Copy-ArquivoCompartilhado -Origem $full -Destino $Destino
+    Write-Registro ("  VSS: copiado {0} via shadow {1}" -f $Origem, $shadowId) 'AVISO'
+    return $true
+  } finally {
+    if ($shadowId) {
+      try { [void](& vssadmin.exe delete shadows /shadow="$shadowId" /quiet 2>&1) } catch { }
+    }
+  }
+}
+
+function Copy-HiveArquivo {
+  param([string]$Origem, [string]$Destino, [string]$SidReg, [string]$Rotulo)
+  $ok = $false; $metodo = ''; $erro = ''
+  if (-not (Test-Path -LiteralPath $Origem)) {
+    return [pscustomobject]@{ Ok = $false; Metodo = ''; Erro = 'AUSENTE'; Destino = '' }
+  }
+  try {
+    Copy-ArquivoCompartilhado -Origem $Origem -Destino $Destino
+    $ok = $true; $metodo = 'FileShare'
+  } catch {
+    $erro = ($_.Exception.Message -replace '\s+', ' ')
+  }
+  if (-not $ok -and $SidReg -and ($Rotulo -match 'NTUSER')) {
+    try {
+      if (Test-Path -LiteralPath $Destino) { Remove-Item -LiteralPath $Destino -Force -ErrorAction SilentlyContinue }
+      $outSave = & reg.exe save ("HKU\" + $SidReg) $Destino /y 2>&1 | Out-String
+      if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $Destino)) { $ok = $true; $metodo = 'reg_save'; $erro = '' }
+      else { $erro = ('reg_save: ' + ($outSave -replace '\s+', ' ').Trim()) }
+    } catch { $erro = ($_.Exception.Message -replace '\s+', ' ') }
+  }
+  if (-not $ok) {
+    try {
+      [void](Try-CopyViaVss -Origem $Origem -Destino $Destino)
+      if (Test-Path -LiteralPath $Destino) { $ok = $true; $metodo = 'VSS'; $erro = '' }
+    } catch {
+      $erro = ($erro + ' | VSS: ' + ($_.Exception.Message -replace '\s+', ' ')).Trim(' |')
+    }
+  }
+  if (-not $ok) {
+    [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $Origem; Destino = $Destino; Motivo = $erro; Tipo = 'HIVE' })
+    if (Test-Path -LiteralPath $Destino) {
+      try { Remove-Item -LiteralPath $Destino -Force -ErrorAction SilentlyContinue } catch { }
+    }
+  }
+  return [pscustomobject]@{ Ok = $ok; Metodo = $metodo; Erro = $erro; Destino = $(if ($ok) { $Destino } else { '' }) }
+}
+
+function Get-Sha256SeArquivo {
+  param([string]$Caminho)
+  if ([string]::IsNullOrWhiteSpace($Caminho)) { return '' }
+  $p = $Caminho
+  if ($p -match '^\\\\') { return '' } # device paths skip
+  if ($p.Contains('*') -or $p.Contains('?')) { return '' }
+  try {
+    if (-not [System.IO.File]::Exists($p)) { return 'AUSENTE' }
+    return (Get-Sha256SomenteLeitura -Caminho $p)
+  } catch { return 'ERRO_LEITURA' }
+}
+
+function Write-ManifestoEIndice {
+  param([string]$Motivo = 'normal')
+  # Garante manifesto + INDICE mesmo em abort. So lista arquivos que EXISTEM.
+  Register-OrdemColeta -Etapa 'MANIFESTO' -Detalhe $Motivo
+  # Remove parciais de copias falhas (se algum arquivo ficou orfao)
+  foreach ($f in @($script:FalhasCopia)) {
+    if ($f.Destino -and (Test-Path -LiteralPath $f.Destino)) {
+      try { Remove-Item -LiteralPath $f.Destino -Force -ErrorAction SilentlyContinue } catch { }
+    }
+  }
+  # Confere copias suspeitas: COPIADO* sem arquivo vira FALHA
+  foreach ($c in @($script:CopiasSuspeitos)) {
+    if ($c.Decisao -match '^COPIADO' -and $c.Destino -and -not (Test-Path -LiteralPath $c.Destino)) {
+      $c.Decisao = 'FALHA_ARQUIVO_AUSENTE_POS_COPIA'
+      [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $c.Origem; Destino = $c.Destino; Motivo = 'sumiu apos decisao COPIADO'; Tipo = 'SUSPEITO' })
+    }
+  }
+  try {
+    if (-not (Test-Path -LiteralPath (Join-Path $script:Out '19_falhas_copia.csv'))) {
+      Save-Csv '19_falhas_copia.csv' $script:FalhasCopia 'Copias que falharam (nao entram no manifesto)'
+    }
+  } catch { }
+  try {
+    if (-not (Test-Path -LiteralPath (Join-Path $script:Out '00b_ordem_coleta.csv'))) {
+      Save-Csv '00b_ordem_coleta.csv' $script:OrdemColeta 'Ordem de coleta com timestamps e operador'
+    }
+  } catch { }
+  $manif = Join-Path $script:Out 'MANIFESTO_SHA256.txt'
+  $linhas = New-Object System.Collections.ArrayList
+  $ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')
+  [void]$linhas.Add(('# Manifesto SHA-256 - Equip={0} Host={1} Pasta={2} GeradoUTC={3} Motivo={4} Operador={5}' -f $Equip, $env:COMPUTERNAME, (Split-Path $script:Out -Leaf), $ts, $Motivo, $script:OperadorNome))
+  $baseLen = $script:Out.TrimEnd('\').Length + 1
+  $n = 0
+  if (Test-Path -LiteralPath $script:Out) {
+    foreach ($f in (Get-ChildItem -LiteralPath $script:Out -File -Recurse -Force -ErrorAction SilentlyContinue | Where-Object { $_.FullName -ne $manif -and $_.FullName -notlike ($script:Out + '\_kit_tmp\*') } | Sort-Object FullName)) {
+      try {
+        if (-not $f.Exists) { continue }
+        $h = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
+        [void]$linhas.Add(('{0}  {1}' -f $h, $f.FullName.Substring($baseLen).Replace('\', '/')))
+        $n++
+      } catch {
+        [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $f.FullName; Destino = ''; Motivo = ('hash_manifesto: ' + $_.Exception.Message); Tipo = 'MANIFESTO' })
+        Write-Registro ("  manifesto: falha ao hashear {0}: {1}" -f $f.FullName, $_.Exception.Message) 'AVISO'
+      }
+    }
+  }
+  [System.IO.File]::WriteAllLines($manif, [string[]]$linhas.ToArray([string]), (New-Object System.Text.UTF8Encoding $false))
+  $hm = ''
+  try { $hm = (Get-FileHash -LiteralPath $manif -Algorithm SHA256).Hash } catch { $hm = 'ERRO' }
+  try { [System.IO.File]::WriteAllText(($manif + '.sha256'), (('{0}  MANIFESTO_SHA256.txt' -f $hm.ToLower()) + "`r`n"), (New-Object System.Text.UTF8Encoding $false)) } catch { }
+  $fimTxt = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+  try {
+    [System.IO.File]::AppendAllText((Join-Path $Destino 'INDICE_COLETAS.txt'), (('{0} | {1} | {2} | {3} | manifesto SHA-256 {4} | op={5} | motivo={6}' -f $fimTxt, $Equip, $env:COMPUTERNAME, (Split-Path $script:Out -Leaf), $hm, $script:OperadorNome, $Motivo) + "`r`n"), $script:Utf8Bom)
+  } catch {
+    Write-Registro ("  falha ao atualizar INDICE_COLETAS: {0}" -f $_.Exception.Message) 'AVISO'
+  }
+  Write-Registro ("Manifesto gerado ({0} arquivos, motivo={1}). SHA-256={2}" -f $n, $Motivo, $hm)
+  return $hm
+}
+
+
 function Get-BannerKit {
   $v = [string]$VersaoScript
   if ([string]::IsNullOrWhiteSpace($v)) { $v = '?' }
@@ -344,6 +705,16 @@ function Write-BannerKit {
 
 # ID obrigatorio no formato EQ## (1 / EQ1 / EQ01 -> EQ01). Texto livre e rejeitado.
 $Equip = Get-EquipIdValidado $Equip
+# Operador (v1.4.7): parametro, senao env KIT_OPERADOR, senao pergunta (nao bloqueia se vazio em -NonInteractive)
+if (-not [string]::IsNullOrWhiteSpace($Operador)) { $script:OperadorNome = $Operador.Trim() }
+elseif (-not [string]::IsNullOrWhiteSpace($env:KIT_OPERADOR)) { $script:OperadorNome = $env:KIT_OPERADOR.Trim() }
+else {
+  try {
+    $opAsk = Read-Host 'Nome do operador/perito (Enter=desconhecido)'
+    if (-not [string]::IsNullOrWhiteSpace($opAsk)) { $script:OperadorNome = $opAsk.Trim() }
+  } catch { }
+}
+if ([string]::IsNullOrWhiteSpace($script:OperadorNome)) { $script:OperadorNome = 'NAO_INFORMADO' }
 # v1.4.3: hives offline LIGADO por padrao (admin). -SemHivesOffline desliga.
 # Risco residual documentado: reg load da COPIA ainda toca HKU no PC vistoriado enquanto a coleta roda.
 if ($SemHivesOffline) { $LerHivesOffline = $false }
@@ -425,6 +796,8 @@ else { Write-Registro 'Hives offline: desligado (perfis deslogados sem Uninstall
 if ($CopiarSuspeitos) { Write-Registro ('Copia automatica de suspeitos: LIGADA (indicios FORTES + DLLs licenca nao assinadas; pergunta se > {0} MB)' -f $LimitePerguntaCopiaMB) }
 else { Write-Registro 'Copia automatica de suspeitos: desligada (-SemCopiarSuspeitos)' }
 try { $hs = Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256; Write-Registro ("SHA-256 deste script: {0}" -f $hs.Hash) } catch { }
+Write-Registro ("Operador: {0}" -f $script:OperadorNome)
+Register-OrdemColeta -Etapa 'INICIO' -Detalhe ('v' + $VersaoScript)
 
 function Get-EspacoLivreBytes {
   param([string]$Raiz)
@@ -541,10 +914,19 @@ function Copy-ArquivoSuspeito {
     # se ja existe, nao sobrescreve
     if (-not (Test-Path -LiteralPath $dst)) {
       try { [System.IO.File]::Copy($Origem, $dst, $true) } catch {
-        [void]$script:CopiasSuspeitos.Add([pscustomobject]@{ Origem = $Origem; Destino = $dst; Motivo = $Motivo; Classe = $Classe; Decisao = ('ERRO_COPIA: ' + ($_.Exception.Message -replace '\s+', ' ')); TamanhoBytes = $tam; SHA256Origem = $shaO; SHA256Destino = ''; HashOk = $false; CriadoOrigemAntes = $cAntes; ModificadoOrigemAntes = $mAntes; ModificadoOrigemDepois = $mAntes; TimestampsOrigemOk = $true })
+        $msgE = ($_.Exception.Message -replace '\s+', ' ')
+        if (Test-Path -LiteralPath $dst) { try { Remove-Item -LiteralPath $dst -Force -ErrorAction SilentlyContinue } catch { } }
+        [void]$script:CopiasSuspeitos.Add([pscustomobject]@{ Origem = $Origem; Destino = ''; Motivo = $Motivo; Classe = $Classe; Decisao = ('ERRO_COPIA: ' + $msgE); TamanhoBytes = $tam; SHA256Origem = $shaO; SHA256Destino = ''; HashOk = $false; CriadoOrigemAntes = $cAntes; ModificadoOrigemAntes = $mAntes; ModificadoOrigemDepois = $mAntes; TimestampsOrigemOk = $true })
+        [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $Origem; Destino = $dst; Motivo = $msgE; Tipo = 'SUSPEITO' })
+        Write-Registro ("  FALHA copia suspeito (nao entra no manifesto): {0} - {1}" -f $Origem, $msgE) 'AVISO'
         return $null
       }
     }
+  }
+  if (-not (Test-Path -LiteralPath $dst)) {
+    [void]$script:CopiasSuspeitos.Add([pscustomobject]@{ Origem = $Origem; Destino = ''; Motivo = $Motivo; Classe = $Classe; Decisao = 'ERRO_COPIA_DESTINO_AUSENTE'; TamanhoBytes = $tam; SHA256Origem = $shaO; SHA256Destino = ''; HashOk = $false; CriadoOrigemAntes = $cAntes; ModificadoOrigemAntes = $mAntes; ModificadoOrigemDepois = $mAntes; TimestampsOrigemOk = $true })
+    [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $Origem; Destino = $dst; Motivo = 'destino ausente apos copy'; Tipo = 'SUSPEITO' })
+    return $null
   }
   $shaD = Get-Sha256SomenteLeitura -Caminho $dst
   $hashOk = ($shaO -and $shaD -and $shaO -ne 'ERRO_LEITURA' -and $shaO -eq $shaD)
@@ -586,6 +968,7 @@ function Invoke-Secao {
     return
   }
   Write-Registro "[$Nome] inicio"
+  Register-OrdemColeta -Etapa $Nome -Detalhe 'inicio'
   $status = 'OK'; $obs = ''
   $script:SecaoParcial = New-Object System.Collections.ArrayList
   $Error.Clear()
@@ -628,9 +1011,20 @@ $script:Excluidos = New-Object System.Collections.ArrayList
 # Indicio forte pelo nome, exceto exclusoes explicitas e provaveis FP (imagens/PDF/site-packages/crackfortran).
 $script:RxExtFp = New-Object System.Text.RegularExpressions.Regex('\.(png|jpe?g|gif|bmp|webp|tiff?|psd|xcf|dds|tga|ico|svg|pdf|md|txt|html?|css|woff2?|ttf|otf)$', $rxOpt)
 $script:RxPathFp = New-Object System.Text.RegularExpressions.Regex('(\\site-packages\\|/site-packages/|\\Lib\\numpy|\\numpy\\|\\textures?\\|/textures?/|\\Materials\\|\\Maps\\|\\__pycache__\\|\\node_modules\\)', $rxOpt)
-$script:RxNomeFp = New-Object System.Text.RegularExpressions.Regex('crackfortran|crack[_-]?detection|anti[-_]?crack|uncracked', $rxOpt)
+$script:RxNomeFp = New-Object System.Text.RegularExpressions.Regex('crackfortran|crack[_-]?detection|anti[-_]?crack|uncracked|AdskRcDispatch|AsmPreloader|LibG\\.AsmPreloader', $rxOpt)
 function Test-ProvavelFalsoPositivo([string]$Nome, [string]$Caminho) {
-  if ($script:RxNomeFp.IsMatch($Nome)) { return 'nome conhecido (crackfortran/anti-crack)' }
+  if ($script:RxNomeFp.IsMatch($Nome)) { return 'nome conhecido (crackfortran/anti-crack/AdskRcDispatch/AsmPreloader)' }
+  # Dynamo scripts: Curve.Patch.dyn / Mesh.CloseCracks.dyn / Surface.ByPatch.dyn (nao sao cracks)
+  if ($Nome -match '(?i)\.dyn$' -and $Nome -match '(?i)(patch|crack)') {
+    return 'script Dynamo (.dyn) com Patch/Cracks no nome (FP conhecido)'
+  }
+  # JSON auxiliares Autodesk (crackWidth-*.json, kg-*.json de geometria)
+  if ($Nome -match '(?i)\.json$' -and $Nome -match '(?i)(crackwidth|^kg[-_]|preloader)') {
+    return 'json de geometria/preload Autodesk (FP conhecido)'
+  }
+  if ($Nome -match '(?i)adsk\.preloader\.js$' -or ($Nome -match '(?i)preloader' -and $Nome -match '(?i)\.(js|dll)$' -and $Caminho -match '(?i)(autodesk|revit|dynamo|libg)')) {
+    return 'preloader Autodesk/Dynamo (FP conhecido)'
+  }
   if ($script:RxExtFp.IsMatch($Nome)) { return 'extensao de imagem/documento (nao binario)' }
   if ($Caminho -and $script:RxPathFp.IsMatch($Caminho)) { return 'caminho tipico de biblioteca/textura/site-packages' }
   # "crack" sozinho em nome de textura/mapa sem keygen/kms/ativador
@@ -918,6 +1312,31 @@ function Invoke-Varredura {
 }
 
 # =============================================================================================
+# v1.4.7: se abortar no meio, ainda assim tenta manifesto + INDICE + unload
+# =============================================================================================
+trap {
+  try { Write-Registro ("TRAP/ABORT: {0}" -f $_.Exception.Message) 'ERRO' } catch { }
+  try { Unload-HivesTemporarios } catch { }
+  try {
+    if ($script:Out -and -not (Test-Path -LiteralPath (Join-Path $script:Out 'MANIFESTO_SHA256.txt'))) {
+      if (Get-Command Write-ManifestoEIndice -ErrorAction SilentlyContinue) {
+        [void](Write-ManifestoEIndice -Motivo ('trap:' + (($_.Exception.Message -replace '\s+', ' ').Substring(0, [math]::Min(60, ($_.Exception.Message -replace '\s+', ' ').Length)))))
+      }
+    }
+  } catch { }
+  break
+}
+
+# =============================================================================================
+# v1.4.7: estado do relogio no INICIO (apos helpers/Save-Csv disponiveis)
+# =============================================================================================
+try {
+  $ri = Capture-EstadoRelogio -Momento 'INICIO'
+  Save-Csv '01g_relogio_inicio.csv' $ri 'Relogio do sistema no inicio (hora, fuso, w32tm status/offset) - somente leitura'
+  Write-Registro ("Relogio inicio: local={0} fuso={1} offset_ntp={2} peer={3}" -f $ri.HoraLocal, $ri.FusoId, $ri.W32tmOffset, $ri.W32tmPeerProbe)
+} catch { Write-Registro ("Relogio inicio: falha {0}" -f $_.Exception.Message) 'AVISO' }
+
+# =============================================================================================
 # SECOES DE COLETA (ordem: o que o proprio PowerShell pode alterar e coletado primeiro)
 # =============================================================================================
 
@@ -977,10 +1396,15 @@ Invoke-Secao 'Prefetch (programas executados)' -RequerAdmin {
       $relPf = $false
       [void]$script:Excluidos.Add([pscustomobject]@{ Fonte = 'prefetch'; Nome = $exe; Caminho = $f.FullName; PadraoExclusao = $ExclusaoIndicios; Motivo = 'falso positivo conhecido (ex.: ssh-keygen.exe do OpenSSH casa com o padrao keygen)' })
     }
-    [void]$lin.Add([pscustomobject]@{ Executavel = $exe; Relevante = $relPf; ArquivoPf = $f.Name
-      CriadoPrimeiraExec = (Format-Data $f.CreationTime); ModificadoUltimaExec = (Format-Data $f.LastWriteTime); ModificadoUTC = (Format-DataUtc $f.LastWriteTime); TamanhoBytes = $f.Length })
+    $info = Read-PrefetchInfo -Caminho $f.FullName
+    [void]$lin.Add([pscustomobject]@{
+      Executavel = $exe; Relevante = $relPf; ArquivoPf = $f.Name
+      CriadoPrimeiraExec = (Format-Data $f.CreationTime); ModificadoUltimaExec = (Format-Data $f.LastWriteTime); ModificadoUTC = (Format-DataUtc $f.LastWriteTime); TamanhoBytes = $f.Length
+      PrefetchVersao = $info.Versao; RunCount = $info.RunCount; UltimasExecucoes = $info.UltimasExecucoes
+      NomeInterno = $info.NomeExeInterno; ParseOk = $info.Ok; ParseErro = $info.Erro
+    })
   }
-  Save-Csv '13_prefetch.csv' ($lin | Sort-Object ModificadoUltimaExec -Descending) 'Prefetch: nome e datas (sem abrir os .pf). POWERSHELL/CMD/CONHOST podem refletir esta coleta.'
+  Save-Csv '13_prefetch.csv' ($lin | Sort-Object ModificadoUltimaExec -Descending) 'Prefetch: metadados + RunCount/ultimas execucoes (v17/23/26/30; MAM descompactado via ntdll). POWERSHELL/CMD/CONHOST podem refletir esta coleta.'
 }
 
 Invoke-Secao 'Arquivos recentes (Recent .lnk e Jump Lists)' {
@@ -1156,7 +1580,35 @@ Invoke-Secao 'Hives offline (copia NTUSER.DAT no pendrive)' {
     [void]$lin.Add([pscustomobject]@{ Usuario = $p.Usuario; SID = $p.SID; Status = 'CARREGADO_VIA_COPIA'; Copia = $dst; ChaveTemp = $chave })
     Write-Registro ("  hive offline carregado: {0} -> HKU\\{1}" -f $p.Usuario, $chave)
   }
-  Save-Csv '01f_hives_offline.csv' $lin 'Hives de usuarios deslogados: copia no pendrive + reg load da copia (original nao escrito)'
+  Save-Csv '01f_hives_offline.csv' $lin 'Hives de usuarios (logados e deslogados): copia no pendrive + reg load da copia quando aplicavel (original nao escrito)'
+
+  # v1.4.7: UsrClass.dat de todos os perfis (AppData\Local\Microsoft\Windows\UsrClass.dat)
+  $linU = New-Object System.Collections.ArrayList
+  foreach ($p in $script:Perfis) {
+    if (Test-PerfilEspecial $p.Usuario -and $p.Usuario -notmatch '(?i)^Default$') {
+      [void]$linU.Add([pscustomobject]@{ Usuario = $p.Usuario; SID = $p.SID; Status = 'PERFIL_ESPECIAL_PULADO'; Copia = ''; Metodo = '' })
+      continue
+    }
+    $uc = Join-Path $p.Caminho 'AppData\Local\Microsoft\Windows\UsrClass.dat'
+    $sidSafe = if ($p.SID) { ($p.SID -replace '[^A-Za-z0-9-]', '_') } else { ($p.Usuario -replace '[^A-Za-z0-9_-]', '_') }
+    $dstU = Join-Path $dirHives ($sidSafe + '_UsrClass.dat')
+    $sidClasses = ''
+    if ($p.SID -and $p.HiveCarregado) { $sidClasses = $p.SID + '_Classes' }
+    $r = Copy-HiveArquivo -Origem $uc -Destino $dstU -SidReg $sidClasses -Rotulo 'UsrClass'
+    $st = if ($r.Ok) { 'COPIADO' } else { ('FALHA: ' + $r.Erro) }
+    [void]$linU.Add([pscustomobject]@{ Usuario = $p.Usuario; SID = $p.SID; Status = $st; Copia = $r.Destino; Metodo = $r.Metodo })
+    if ($r.Ok) {
+      foreach ($suf in ('.LOG', '.LOG1', '.LOG2')) {
+        $srcL = $uc + $suf
+        if (Test-Path -LiteralPath $srcL) {
+          try { Copy-ArquivoCompartilhado -Origem $srcL -Destino ($dstU + $suf) } catch {
+            [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $srcL; Destino = ($dstU + $suf); Motivo = $_.Exception.Message; Tipo = 'HIVE_LOG' })
+          }
+        }
+      }
+    }
+  }
+  Save-Csv '01h_usrclass.csv' $linU 'UsrClass.dat de todos os perfis (FileShare / reg save HKU\SID_Classes / VSS)'
 }
 
 Invoke-Secao 'MRU do registro (usuarios com hive carregado)' {
@@ -1390,11 +1842,18 @@ Invoke-Secao 'Hosts e firewall (bloqueio de ativacao)' {
       if (-not $rxFwTxt.IsMatch($d)) { continue }
       $campos = @{}
       foreach ($par in $d.Split('|')) { $ix = $par.IndexOf('='); if ($ix -gt 0) { $campos[$par.Substring(0, $ix)] = $par.Substring($ix + 1) } }
-      [void]$fw.Add([pscustomobject]@{ Origem = $loc[1]; Acao = $campos['Action']; Ativa = $campos['Active']; Direcao = $campos['Dir']; Programa = $campos['App']; Nome = $campos['Name']; Descricao = $campos['Desc']; IdRegra = $vn; Bruto = $d })
+      $progPath = [string]$campos['App']
+      $shaProg = ''
+      if ($progPath -and $progPath -ne 'System' -and $progPath -notmatch '(?i)^[A-Za-z]:\\Windows\\System32\\svchost') {
+        $exp = $progPath
+        try { $exp = [Environment]::ExpandEnvironmentVariables($progPath) } catch { }
+        $shaProg = Get-Sha256SeArquivo -Caminho $exp
+      }
+      [void]$fw.Add([pscustomobject]@{ Origem = $loc[1]; Acao = $campos['Action']; Ativa = $campos['Active']; Direcao = $campos['Dir']; Programa = $campos['App']; SHA256Programa = $shaProg; Nome = $campos['Name']; Descricao = $campos['Desc']; IdRegra = $vn; Bruto = $d })
     }
     $k.Close()
   }
-  Save-Csv '09_firewall_regras_registro.csv' $fw 'Regras de firewall que citam programas dos fabricantes (Acao=Block indica bloqueio de validacao)'
+  Save-Csv '09_firewall_regras_registro.csv' $fw 'Regras de firewall dos fabricantes + SHA-256 do binario referenciado (se arquivo existir)'
   # Conferencia cruzada com o cmdlet (pode ser lento: tempo limite); fallback netsh
   try {
     $r = Invoke-ComLimite -Segundos 60 -Argumentos @($rxFwTxt.ToString()) -Bloco {
@@ -1404,11 +1863,23 @@ Invoke-Secao 'Hosts e firewall (bloqueio de ativacao)' {
       Get-NetFirewallRule -All -ErrorAction Stop | ForEach-Object {
         $prog = [string]$apps[$_.InstanceID]
         if (($prog + ' ' + $_.DisplayName) -match $rx) {
-          [pscustomobject]@{ Nome = $_.DisplayName; Direcao = [string]$_.Direction; Acao = [string]$_.Action; Habilitada = [string]$_.Enabled; Perfil = [string]$_.Profile; Programa = $prog; Origem = [string]$_.PolicyStoreSourceType; Id = $_.InstanceID }
+          [pscustomobject]@{ Nome = $_.DisplayName; Direcao = [string]$_.Direction; Acao = [string]$_.Action; Habilitada = [string]$_.Enabled; Perfil = [string]$_.Profile; Programa = $prog; SHA256Programa = ''; Origem = [string]$_.PolicyStoreSourceType; Id = $_.InstanceID }
         }
       }
     }
-    Save-Csv '09b_firewall_regras_cmdlet.csv' $r 'Regras de firewall (Get-NetFirewallRule) que citam os fabricantes'
+    # v1.4.7: hash no runspace principal (Invoke-ComLimite nao ve funcoes do script)
+    $r2 = New-Object System.Collections.ArrayList
+    foreach ($row in @($r)) {
+      $shaP = ''
+      if ($row.Programa) {
+        try { $shaP = Get-Sha256SeArquivo -Caminho ([Environment]::ExpandEnvironmentVariables([string]$row.Programa)) } catch { }
+      }
+      [void]$r2.Add([pscustomobject]@{
+        Nome = $row.Nome; Direcao = $row.Direcao; Acao = $row.Acao; Habilitada = $row.Habilitada; Perfil = $row.Perfil
+        Programa = $row.Programa; SHA256Programa = $shaP; Origem = $row.Origem; Id = $row.Id
+      })
+    }
+    Save-Csv '09b_firewall_regras_cmdlet.csv' $r2 'Regras de firewall (Get-NetFirewallRule) + SHA-256 do programa'
   } catch {
     Write-Registro ("  Get-NetFirewallRule falhou ({0}); usando netsh" -f $_.Exception.Message) 'AVISO'
     $txt = (& "$env:SystemRoot\System32\netsh.exe" advfirewall firewall show rule name=all verbose 2>$null) -join "`r`n"
@@ -1573,6 +2044,48 @@ Invoke-Secao 'Windows Defender: deteccoes e exclusoes' {
     Save-Csv '17d_defender_exclusoes_registro_detalhe.csv' $excLin 'Detalhe das exclusoes lidas do registro (fallback)'
     Write-Registro ("  fallback registro: {0} valor(es) de exclusao; DisableRealtime={1}" -f $excLin.Count, $rtp)
   }
+
+  # v1.4.7: SHA-256 dos caminhos de exclusao que sao arquivos existentes
+  $hashExc = New-Object System.Collections.ArrayList
+  $candsExc = New-Object System.Collections.Generic.List[string]
+  try {
+    if (Test-Path -LiteralPath (Join-Path $script:Out '17c_defender_exclusoes.csv')) {
+      $rows = Import-Csv -LiteralPath (Join-Path $script:Out '17c_defender_exclusoes.csv') -Delimiter ';' -ErrorAction SilentlyContinue
+      foreach ($row in @($rows)) {
+        foreach ($prop in 'ExclusaoCaminhos','ExclusaoProcessos') {
+          $val = [string]$row.$prop
+          if ([string]::IsNullOrWhiteSpace($val) -or $val -eq 'sem registros') { continue }
+          foreach ($piece in ($val -split '\s*\|\s*')) {
+            $p = $piece.Trim().Trim('"')
+            if ($p -and -not $candsExc.Contains($p)) { $candsExc.Add($p) }
+          }
+        }
+      }
+    }
+  } catch { }
+  if (Test-Path -LiteralPath (Join-Path $script:Out '17d_defender_exclusoes_registro_detalhe.csv')) {
+    try {
+      foreach ($row in @(Import-Csv -LiteralPath (Join-Path $script:Out '17d_defender_exclusoes_registro_detalhe.csv') -Delimiter ';' -ErrorAction SilentlyContinue)) {
+        foreach ($cand in @([string]$row.Nome, [string]$row.Valor)) {
+          $p = $cand.Trim().Trim('"')
+          if ($p -and ($p.Length -gt 3) -and ($p[1] -eq ':') -and -not $candsExc.Contains($p)) { $candsExc.Add($p) }
+        }
+      }
+    } catch { }
+  }
+  foreach ($p in $candsExc) {
+    $exp = $p
+    try { $exp = [Environment]::ExpandEnvironmentVariables($p) } catch { }
+    $isFile = $false
+    try { $isFile = [System.IO.File]::Exists($exp) } catch { }
+    if (-not $isFile) {
+      [void]$hashExc.Add([pscustomobject]@{ Caminho = $exp; Tipo = 'nao_arquivo_ou_ausente'; SHA256 = '' })
+      continue
+    }
+    $sha = Get-Sha256SeArquivo -Caminho $exp
+    [void]$hashExc.Add([pscustomobject]@{ Caminho = $exp; Tipo = 'arquivo'; SHA256 = $sha })
+  }
+  Save-Csv '17e_defender_exclusoes_hash.csv' $hashExc 'SHA-256 das exclusoes Defender que apontam para arquivo existente'
 }
 
 
@@ -1582,6 +2095,18 @@ Invoke-Secao 'Arquivos de licenca e pastas dos fabricantes' {
     [void]$lic.Add(@((Join-Path $script:PD $rel), ('ProgramData\' + $rel)))
   }
   if ($script:CPF86) { [void]$lic.Add(@((Join-Path $script:CPF86 'Macrovision Shared\FlexNet Publisher'), 'CommonFiles(x86)\Macrovision Shared\FlexNet Publisher')) }
+  # v1.4.7: pastas NLM / FLEXnet tipicas (licenses.lic, licpath.lic, *.dat)
+  foreach ($n in @(
+    (Join-Path $script:CPF86 'Autodesk Shared\Network License Manager'),
+    (Join-Path $script:CPF64 'Autodesk Shared\Network License Manager'),
+    (Join-Path $script:PF86 'Common Files\Autodesk Shared\Network License Manager'),
+    (Join-Path $script:PF64 'Common Files\Autodesk Shared\Network License Manager'),
+    (Join-Path $script:PD 'FLEXnet'),
+    (Join-Path $script:PD 'FlexLM'),
+    (Join-Path $env:ProgramData 'Autodesk\CLM\LGS')
+  )) {
+    if ($n -and (Test-Path -LiteralPath $n)) { [void]$lic.Add(@($n, ('nlm:' + $n))) }
+  }
   foreach ($p in $script:Perfis) {
     if (Test-PerfilEspecial $p.Usuario) { continue }  # v1.4.6
     foreach ($rel in $script:LicencaProgramData) {
@@ -1623,6 +2148,134 @@ Invoke-Secao 'Arquivos de licenca e pastas dos fabricantes' {
     } else { $r.SHA256 = 'NAO_CALCULADO_TAMANHO' }
   }
   Save-Csv '07_arquivos_licenca.csv' $script:Achados['Licenca'] 'Arquivos em pastas de licenciamento (metadados + SHA-256; conteudo nao alterado)'
+
+  # v1.4.7: copia obrigatoria de .lic/.dat referenciados (registro, env LM_LICENSE_FILE / *_LICENSE_FILE, pastas NLM)
+  $dirLicRef = Join-Path $script:Out 'licencas_referenciadas'
+  [void][System.IO.Directory]::CreateDirectory($dirLicRef)
+  $refs = New-Object System.Collections.ArrayList
+  $pathsRef = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+
+  function Add-LicPath([string]$P, [string]$Fonte) {
+    if ([string]::IsNullOrWhiteSpace($P)) { return }
+    $p2 = $P.Trim().Trim('"')
+    # port@host form (27080@localhost) - nao e arquivo
+    if ($p2 -match '^[0-9]+@') {
+      [void]$refs.Add([pscustomobject]@{ Fonte = $Fonte; Referencia = $p2; Tipo = 'servidor_porta'; Copia = ''; SHA256 = ''; Status = 'NAO_ARQUIVO' })
+      return
+    }
+    # lista separada por ;
+    foreach ($piece in ($p2 -split ';')) {
+      $q = $piece.Trim().Trim('"')
+      if (-not $q) { continue }
+      if ($q -match '^[0-9]+@') {
+        [void]$refs.Add([pscustomobject]@{ Fonte = $Fonte; Referencia = $q; Tipo = 'servidor_porta'; Copia = ''; SHA256 = ''; Status = 'NAO_ARQUIVO' })
+        continue
+      }
+      try { $q = [Environment]::ExpandEnvironmentVariables($q) } catch { }
+      [void]$pathsRef.Add($q + '|' + $Fonte)
+    }
+  }
+
+  # Env do processo + Machine + User
+  foreach ($vn in @('LM_LICENSE_FILE','ADSKFLEX_LICENSE_FILE','FLEXLM_LICENSE_FILE','SLIC_LICENSE_FILE')) {
+    Add-LicPath -P ([string][Environment]::GetEnvironmentVariable($vn, 'Process')) -Fonte ('env_process:' + $vn)
+    Add-LicPath -P ([string][Environment]::GetEnvironmentVariable($vn, 'Machine')) -Fonte ('env_machine:' + $vn)
+    Add-LicPath -P ([string][Environment]::GetEnvironmentVariable($vn, 'User')) -Fonte ('env_user:' + $vn)
+  }
+  Get-ChildItem Env: | Where-Object { $_.Name -match '_LICENSE_FILE$' } | ForEach-Object {
+    Add-LicPath -P ([string]$_.Value) -Fonte ('env_process:' + $_.Name)
+  }
+
+  # Registro: valores que parecem caminho .lic/.dat ou License
+  $rxLicVal = New-Object System.Text.RegularExpressions.Regex('(?i)(\.lic|\.dat|licpath|licenses\.lic|LicenseFile|LICENSE_FILE|AdskNLM)', $rxOpt)
+  foreach ($v in $script:Views) {
+    $base = $script:HKLM[$v.Rot]
+    foreach ($raiz in @('SOFTWARE\FLEXlm License Manager','SOFTWARE\Flexera Software','SOFTWARE\Autodesk','SOFTWARE\WOW6432Node\Autodesk','SOFTWARE\WOW6432Node\FLEXlm License Manager')) {
+      $k0 = Open-Key $base $raiz
+      if ($null -eq $k0) { continue }
+      $k0.Close()
+      $pilha = New-Object System.Collections.Generic.Stack[string]
+      $pilha.Push($raiz)
+      $nVisit = 0
+      while ($pilha.Count -gt 0 -and $nVisit -lt 2000) {
+        $nVisit++
+        $pp = $pilha.Pop()
+        $kk = Open-Key $base $pp
+        if ($null -eq $kk) { continue }
+        try {
+          foreach ($vn in $kk.GetValueNames()) {
+            $val = [string](Get-RV $kk $vn)
+            if ($val -and ($rxLicVal.IsMatch($vn) -or $rxLicVal.IsMatch($val) -or $vn -match '(?i)license')) {
+              Add-LicPath -P $val -Fonte ('HKLM\' + $pp + '\' + $vn)
+            }
+          }
+          foreach ($sk in $kk.GetSubKeyNames()) { $pilha.Push($pp + '\' + $sk) }
+        } catch { }
+        $kk.Close()
+      }
+    }
+  }
+  # HKU env / Autodesk por SID carregado
+  foreach ($sid in $script:SidsCarregados) {
+    $chaveLeitura = $sid
+    if ($script:HiveAlias -and $script:HiveAlias.ContainsKey($sid)) { $chaveLeitura = $script:HiveAlias[$sid] }
+    $ke = Open-Key $script:HKU ($chaveLeitura + '\Environment')
+    if ($ke) {
+      foreach ($vn in $ke.GetValueNames()) {
+        if ($vn -match '(?i)LICENSE_FILE|ADSKFLEX|FLEXLM|LM_LICENSE') {
+          Add-LicPath -P ([string](Get-RV $ke $vn)) -Fonte ('HKU\' + $chaveLeitura + '\Environment\' + $vn)
+        }
+      }
+      $ke.Close()
+    }
+  }
+
+  # Arquivos ja achados na varredura com nome licenca tipico
+  foreach ($r in $script:Achados['Licenca']) {
+    if ($r.Nome -match '(?i)^(licenses\.lic|licpath\.lic|.*\.lic|.*\.licx|LGS\.data)$') {
+      [void]$pathsRef.Add($r.Caminho + '|varredura07')
+    }
+  }
+
+  $iRef = 0
+  foreach ($entry in @($pathsRef)) {
+    $parts = $entry -split '\|', 2
+    # split on first | 
+    $ix = $entry.LastIndexOf('|')
+    if ($ix -lt 0) { $q = $entry; $fonte = '' } else { $q = $entry.Substring(0, $ix); $fonte = $entry.Substring($ix + 1) }
+    if (-not (Test-Path -LiteralPath $q)) {
+      # se for diretorio, procurar .lic/.dat dentro
+      if (Test-Path -LiteralPath $q -PathType Container) {
+        try {
+          foreach ($f in (Get-ChildItem -LiteralPath $q -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -match '(?i)\.(lic|licx|dat)$' -or $_.Name -match '(?i)licpath|licenses' })) {
+            [void]$pathsRef.Add($f.FullName + '|' + $fonte + ':dir')
+          }
+        } catch { }
+      }
+      [void]$refs.Add([pscustomobject]@{ Fonte = $fonte; Referencia = $q; Tipo = 'caminho'; Copia = ''; SHA256 = ''; Status = 'AUSENTE' })
+      continue
+    }
+    if (-not [System.IO.File]::Exists($q)) {
+      [void]$refs.Add([pscustomobject]@{ Fonte = $fonte; Referencia = $q; Tipo = 'diretorio'; Copia = ''; SHA256 = ''; Status = 'DIR' })
+      continue
+    }
+    $iRef++
+    $fi = New-Object System.IO.FileInfo $q
+    $dst = Join-Path $dirLicRef ('{0:D4}_{1}' -f $iRef, $fi.Name)
+    $sha = Get-Sha256SomenteLeitura -Caminho $q
+    $st = 'COPIADO'
+    try {
+      [System.IO.File]::Copy($q, $dst, $false)
+      if (-not (Test-Path -LiteralPath $dst)) { throw 'destino ausente apos copy' }
+    } catch {
+      $st = 'FALHA_COPIA'
+      [void]$script:FalhasCopia.Add([pscustomobject]@{ Origem = $q; Destino = $dst; Motivo = $_.Exception.Message; Tipo = 'LICENCA_REF' })
+      if (Test-Path -LiteralPath $dst) { try { Remove-Item -LiteralPath $dst -Force -ErrorAction SilentlyContinue } catch { } }
+      $dst = ''
+    }
+    [void]$refs.Add([pscustomobject]@{ Fonte = $fonte; Referencia = $q; Tipo = 'arquivo'; Copia = $dst; SHA256 = $sha; Status = $st; TamanhoBytes = $fi.Length })
+  }
+  Save-Csv '07b_licencas_referenciadas.csv' $refs 'Caminhos de licenca referidos em registro/env/pastas NLM + copia no pendrive (licenses.lic/licpath.lic/.dat)'
 
   # Pastas dos fabricantes (instalacao atual ou residuos de desinstalacao)
   $pastas = New-Object System.Collections.ArrayList
@@ -2143,39 +2796,75 @@ function Unload-HivesTemporarios {
 }
 
 $hm = ''
+$script:ManifestoMotivo = 'normal'
 try {
   Unload-HivesTemporarios
 
+  # Relogio no fim (antes do resumo/manifesto)
+  try {
+    $rf = Capture-EstadoRelogio -Momento 'FIM'
+    Save-Csv '01g_relogio_fim.csv' $rf 'Relogio do sistema no fim (hora, fuso, w32tm status/offset) - somente leitura'
+    Write-Registro ("Relogio fim: local={0} offset_ntp={1}" -f $rf.HoraLocal, $rf.W32tmOffset)
+  } catch { Write-Registro ("Relogio fim: falha {0}" -f $_.Exception.Message) 'AVISO' }
+
+  # Captura de tela FINAL (v1.4.7)
+  if ($CapturaTela) {
+    try {
+      Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+      Add-Type -AssemblyName System.Drawing -ErrorAction SilentlyContinue
+      $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+      $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+      $g = [System.Drawing.Graphics]::FromImage($bmp)
+      $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+      $pCap = Join-Path $script:Out '01e_captura_tela_fim.png'
+      $bmp.Save($pCap, [System.Drawing.Imaging.ImageFormat]::Png)
+      $g.Dispose(); $bmp.Dispose()
+      Write-Registro ("Captura de tela FINAL salva ({0}x{1})" -f $b.Width, $b.Height)
+      Register-OrdemColeta -Etapa 'CAPTURA_TELA_FIM' -Detalhe ($b.Width.ToString() + 'x' + $b.Height.ToString())
+    } catch {
+      Write-Registro ("Captura de tela FINAL falhou: {0}" -f $_.Exception.Message) 'AVISO'
+    }
+  }
+
   # v1.4: resumo minimo ANTES do manifesto (entra na cadeia de custodia)
   [void](Write-ResumoMinimo)
-  # Garante CSV de copias mesmo se secao anterior pulou
   if (-not (Test-Path -LiteralPath (Join-Path $script:Out '11g_copias_suspeitos.csv'))) {
     Save-Csv '11g_copias_suspeitos.csv' $script:CopiasSuspeitos 'Decisoes de copia automatica de suspeitos (SHA-256 origem/destino, S/N se > limiar, timestamps origem)'
   }
+  Save-Csv '00b_ordem_coleta.csv' $script:OrdemColeta 'Ordem de coleta com timestamps e operador'
+  Save-Csv '19_falhas_copia.csv' $script:FalhasCopia 'Copias que falharam (nao entram no manifesto)'
   Save-Csv '00_indice_arquivos.csv' $script:Arquivos 'Indice dos arquivos gerados (inclui 00_RESUMO.txt e suspeitos_copias)'
   Write-Registro 'Gerando manifesto SHA-256 (nada mais sera gravado nesta pasta depois dele).'
-
-  $manif = Join-Path $script:Out 'MANIFESTO_SHA256.txt'
-  $linhas = New-Object System.Collections.ArrayList
-  [void]$linhas.Add(('# Manifesto SHA-256 - Equip={0} Host={1} Pasta={2} GeradoUTC={3}' -f $Equip, $env:COMPUTERNAME, (Split-Path $script:Out -Leaf), (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss')))
-  $baseLen = $script:Out.TrimEnd('\').Length + 1
-  foreach ($f in (Get-ChildItem -LiteralPath $script:Out -File -Recurse -Force | Where-Object { $_.FullName -ne $manif } | Sort-Object FullName)) {
-    $h = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
-    [void]$linhas.Add(('{0}  {1}' -f $h, $f.FullName.Substring($baseLen).Replace('\', '/')))
+  $hm = Write-ManifestoEIndice -Motivo 'normal'
+}
+catch {
+  $script:ManifestoMotivo = 'abort'
+  Write-Registro ("ABORT durante encerramento: {0}" -f $_.Exception.Message) 'ERRO'
+  try {
+    $msgA = ($_.Exception.Message -replace '\s+', ' ')
+    if ($msgA.Length -gt 80) { $msgA = $msgA.Substring(0, 80) }
+    $hm = Write-ManifestoEIndice -Motivo ('abort:' + $msgA)
+  } catch {
+    Write-Registro ("Falha critica ao gerar manifesto no abort: {0}" -f $_.Exception.Message) 'ERRO'
   }
-  [System.IO.File]::WriteAllLines($manif, [string[]]$linhas.ToArray([string]), (New-Object System.Text.UTF8Encoding $false))
-  $hm = (Get-FileHash -LiteralPath $manif -Algorithm SHA256).Hash
-  try { [System.IO.File]::WriteAllText(($manif + '.sha256'), (('{0}  MANIFESTO_SHA256.txt' -f $hm.ToLower()) + "`r`n"), (New-Object System.Text.UTF8Encoding $false)) } catch { }
-  try { [System.IO.File]::AppendAllText((Join-Path $Destino 'INDICE_COLETAS.txt'), (('{0} | {1} | {2} | {3} | manifesto SHA-256 {4}' -f $fim.ToString('yyyy-MM-dd HH:mm:ss'), $Equip, $env:COMPUTERNAME, (Split-Path $script:Out -Leaf), $hm) + "`r`n"), $script:Utf8Bom) } catch { }
 }
 finally {
-  # Garante unload mesmo se resumo/manifesto falhar
   try { Unload-HivesTemporarios } catch { }
+  try {
+    if (-not (Test-Path -LiteralPath (Join-Path $script:Out 'MANIFESTO_SHA256.txt'))) {
+      $hm = Write-ManifestoEIndice -Motivo 'finally_sem_manifesto'
+    }
+  } catch { }
+  try {
+    if ($script:KitTmp -and (Test-Path -LiteralPath $script:KitTmp)) {
+      Remove-Item -LiteralPath $script:KitTmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  } catch { }
 }
 
 Write-Host ''
 Write-Host '==================================================================' -ForegroundColor Cyan
-Write-Host (' COLETA CONCLUIDA  Equip {0}  Host {1}' -f $Equip, $env:COMPUTERNAME) -ForegroundColor Cyan
+Write-Host (' COLETA CONCLUIDA  Equip {0}  Host {1}  Op {2}' -f $Equip, $env:COMPUTERNAME, $script:OperadorNome) -ForegroundColor Cyan
 Write-Host (' Pasta: {0}' -f $script:Out)
 Write-Host (' Administrador: {0}   Duracao: {1:N0}s' -f $script:IsAdmin, ($fim - $script:Inicio).TotalSeconds)
 Write-Host (' Programas das autoras: {0}   Arquivos de projeto: {1}   Indicios fortes: {2}' -f $fab.Count, $script:Achados['Projeto'].Count, $script:Achados['Forte'].Count)
