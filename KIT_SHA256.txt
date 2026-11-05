@@ -1,9 +1,9 @@
 # Hashes SHA-256 dos arquivos do kit presentes neste repositorio.
-# Intermediarias (v1.4 ate v1.4.5) foram removidas da arvore;
-# permanecem no historico git. Conferencia: sha256sum -c KIT_SHA256.txt --ignore-missing
+# Intermediarias foram removidas da arvore; permanecem no historico git.
+# Conferencia: sha256sum -c KIT_SHA256.txt --ignore-missing
 # (nomes sao basenames - rode a partir da pasta do kit no pendrive).
 
-# --- v1.3 2026-10-28 America/Sao_Paulo (oficial estavel pre-1.4; resumo generico + -Destacar) ---
+# --- v1.3 2026-10-28 America/Sao_Paulo (oficial estavel pre-1.4) ---
 83e04ecbe2fe573c64d0c84d9dcdac5d00ae11ebbaf3c95c627d468637c75df7  coleta_inventario_software_v1.3.ps1
 1f1c13b3511f5db469751c201f04dc35cf48ef8ea5333a21745cac20448ae82b  rodar_coleta_v1.3.cmd
 47792d73d6ff5248dd3b75d733f1d793316da5534dc46be342062047a57d2e0b  KIT_PENDRIVE_v1.3.md
@@ -13,13 +13,14 @@
 b86679eda1aeabf290d4437d5dd66c7b3607e3a09b3247d877a21edc1e6a8a71  capturar_tela.cmd
 29254a2d84dfc06da5462c35eb8203cabb05db21189b9f8620bf9854348aa95a  capturar_tela.ps1
 
-# --- v1.4.6 2026-11-03 America/Sao_Paulo (atual; FP servicos; hive sessao ativa; avisos filtrados) ---
-8d12a298bfba8def0626ad9dddd603d2416693cf1f1f9adfa53388d6dbba5c05  coleta_inventario_software_v1.4.6.ps1
-e3575c87fb7614496646882ba2c9aba251307b41ff4bfc52708b7e3011886d29  rodar_coleta_v1.4.6.cmd
-a3d0d48c699e383d052a4b75f117c097f271774ed60a35e0a27365a788bd278e  KIT_PENDRIVE_v1.4.6.md
+# --- v1.4.8 2026-11-05 America/Sao_Paulo (atual; rede/servidores+dedup; formatos) ---
+6d57fd443dbdb759e1cfabc5fa02c05925c294aac2b8338de8c3472a37d0c242  coleta_inventario_software_v1.4.8.ps1
+8397ced4ddfd33d1c940a4dbb9c10ba9c099cd7945eeb3758ef697711637c43f  rodar_coleta_v1.4.8.cmd
+4d1095e6710df0a8e524b093f5a7fe7b35a67bbf1f1ca7dbaf6f805219345d6a  KIT_PENDRIVE_v1.4.8.md
 
 # --- docs / perfil de exemplo (linha 1.4) ---
 ac79f97d74273868fb30bf571ae8332bcbd2444487fce9202184b28b645252c8  CHECKLIST_CAMPO_v1.4.md
 b5cce57a765d295ad230c94d020f682902bc7dbe4ff9687ba8f047f6b88232af  PLANO_v1.4.md
 23152754f2b65c68f44523d86c2a3e586a3b833d95fc2507ba09e486c0b18f7c  INTEGRIDADE.md
 3bc897b0cfb357eb09d2dc2f9767c96d72a8fe0d5b07ce207b63cbfc590bfdec  exemplo_generico.psd1
+e1141a75af5e7e021c94d9248a691a45212f3c03a2482f4aed560a68fb52cac9  CHANGELOG_v1.4.8.md

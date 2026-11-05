@@ -22,3 +22,7 @@ perfis/caso_*.json
 **/coleta/
 **/hives_offline/
 **/suspeitos_copias/
+
+# Build scratch
+_build_v148/
+gif_work/

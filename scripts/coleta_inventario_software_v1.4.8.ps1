@@ -1,7 +1,11 @@
 ﻿<#
-  coleta_inventario_software_v1.4.7.ps1 - Pericia judicial (vistoria de software)
+  coleta_inventario_software_v1.4.8.ps1 - Pericia judicial (vistoria de software)
   Perito: Fabio Slika Stella - CREA/PR PR-224755/D
-  Versao 1.4.7 (04/11/2026) - baseada na v1.4.6 (originais preservados ao lado)
+  Versao 1.4.8 (04/11/2026) - baseada na v1.4.7 (originais preservados ao lado)
+  v1.4.8: descoberta de rede/servidores (SMB/UNC/ARP/DNS/TCP/licenca/DC) com dedup
+        via INDICE_SERVIDORES / coletas anteriores; escaneia shares novos (somente leitura,
+        timeouts); inventarios formatos_resumo.csv + formatos_arquivos.csv (metadados;
+        cabecalho DWG/PDF barato opcional); -SemRede / KIT_REDE=0 para pular.
   v1.4.7: manifesto+INDICE sempre (try/finally); nao lista copia falha no manifesto;
         copia .lic/.dat NLM/FlexLM (registro, env, pastas FLEXnet/NLM, licpath.lic);
         relogio inicio/fim + w32tm status/stripchart (somente leitura);
@@ -39,9 +43,9 @@
     (por padrao <pasta do script>\coleta). Ao final gera manifesto SHA-256 de todos os
     arquivos produzidos.
 
-  COMO USAR (recomendado: pelo lancador rodar_coleta_v1.4.7.cmd, clicando com o botao direito
+  COMO USAR (recomendado: pelo lancador rodar_coleta_v1.4.8.cmd, clicando com o botao direito
   em "Executar como administrador"). Linha de comando equivalente:
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.7.ps1 -Equip EQ01 -CapturaTela
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File E:\coleta_inventario_software_v1.4.8.ps1 -Equip EQ01 -CapturaTela
 
   PARAMETROS PRINCIPAIS
     -Equip                 identificador EQ## (aceita 1/EQ1/EQ01; rejeita texto livre; codigo 6 se invalido)
@@ -59,6 +63,12 @@
     -MRUCompleto           lista TODOS os itens recentes (padrao: so os relacionados)
     -Destacar              (opcional) fabricantes a DESTACAR no topo do resumo. Nunca oculta o resto.
     -Operador              nome do perito/operador (gravado no log e na ordem de coleta)
+    -SemRede               desliga descoberta/escaneamento de servidores de rede
+    -SegundosPorServidor   tempo maximo por servidor (padrao 90)
+    -SegundosTotalServidores tempo total para todos os servidores (padrao 300)
+    -ProfundidadeServidor  profundidade max. ao varrer shares (padrao 4)
+    -ExtensoesFormato      lista .ext separada por virgula (desenho/CAD/BIM); vazia=padrao
+    -SemCabecalhoFormato   nao le primeiros bytes (versao DWG/PDF)
     -ModoTeste             permite gravar no disco do sistema (SO PARA TESTE NO PC DO PERITO)
 
   OBS. TECNICAS
@@ -114,6 +124,16 @@ param(
   [switch]$MRUCompleto,
   [string[]]$Destacar = @(),
   [string]$Operador = '',
+  [switch]$SemRede,
+  [int]$SegundosPorServidor = 90,
+  [int]$SegundosTotalServidores = 300,
+  [int]$ProfundidadeServidor = 4,
+  [int]$MaxArquivosPorServidor = 5000,
+  [int]$SegundosFormatosLocal = 90,
+  [int]$ProfundidadeFormatosLocal = 6,
+  [int]$MaxFormatosArquivos = 100000,
+  [string]$ExtensoesFormato = '.rvt,.rfa,.rte,.dwg,.dxf,.dwt,.dgn,.ipt,.iam,.idw,.nwd,.nwc,.skp,.3dm,.max,.ifc,.sldprt,.sldasm,.slddrw,.pln,.stp,.step,.pdf',
+  [switch]$SemCabecalhoFormato,
   [switch]$ModoTeste
 )
 
@@ -141,7 +161,7 @@ if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProces
 $ErrorActionPreference = 'SilentlyContinue'   # erros sao contados e registrados no log por secao
 $env:PSModuleAnalysisCachePath = 'NUL'         # nao gravar cache de modulos no perfil da maquina vistoriada (v1.1 testes em VM)
 $ProgressPreference    = 'SilentlyContinue'
-$VersaoScript = '1.4.7'
+$VersaoScript = '1.4.8'
 # -Destacar opcional: Corel,Autodesk ou varios -Destacar Corel -Destacar Autodesk. Vazio = generico.
 if ($null -eq $Destacar) { $Destacar = @() }
 elseif ($Destacar.Count -eq 1 -and ([string]$Destacar[0]) -match '[,;]') {
@@ -158,6 +178,21 @@ $script:LicencaProgramData = @('Autodesk\CLM','Autodesk\AdskLicensingService','A
 $script:CandidatosLicencaRx = '^(adlmint|adlmutil|adlmact|adlmPIT|adskflex|AdskLicensing[^\\]*|AdskIdentityManager|AdSSO|LMU|acad|accoreconsole|Inventor|Revit|3dsmax|maya|Navisworks|roamer|CorelDRW|CorelPP|CorelPS|Designer|PASMUTILITY|PSIKey[^\\]*|CrlLicense[^\\]*|iPMClient|ClientServices|WINZIP64|WINZIP32|prl_[^\\]*)\.(dll|exe)$'
 $script:HivesCarregadosTmp = New-Object System.Collections.ArrayList
 $script:ProvavelFp = New-Object System.Collections.ArrayList
+$script:ServidoresDescobertos = New-Object System.Collections.ArrayList
+$script:AcessoPcServidor = New-Object System.Collections.ArrayList
+$script:ServidoresEscaneados = New-Object System.Collections.ArrayList
+$script:FormatosArquivos = New-Object System.Collections.ArrayList
+$script:FormatosStatus = New-Object System.Collections.ArrayList
+$script:MaxFormatosArquivos = $MaxFormatosArquivos
+$script:LerCabecalhoFormatos = (-not $SemCabecalhoFormato)
+$script:ExtensoesFormatoSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($ex in @(($ExtensoesFormato -split '[,;]+') | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+  if (-not $ex.StartsWith('.')) { $ex = '.' + $ex }
+  [void]$script:ExtensoesFormatoSet.Add($ex)
+}
+# env KIT_REDE=0 => SemRede
+if ($env:KIT_REDE -eq '0') { $SemRede = $true }
+
 
 function Import-PerfilColeta {
   param([string]$Caminho)
@@ -1311,6 +1346,594 @@ function Invoke-Varredura {
   Write-Registro ("  varredura {0} [{1}]: {2} ({3} pastas, {4} arquivos, {5} achados, {6} negados, {7}s)" -f $Rotulo, $Modo, $st.Status, $st.Pastas, $st.Arquivos, $st.Achados, $st.AcessoNegado, $st.Segundos)
 }
 
+# === BEGIN v1.4.8 NETWORK + FORMATOS (inserted) ===
+function Get-SafeId([string]$Raw) {
+  if ([string]::IsNullOrWhiteSpace($Raw)) { return 'DESCONHECIDO' }
+  $s = $Raw.Trim().ToUpperInvariant()
+  $s = [regex]::Replace($s, '[^A-Z0-9._-]+', '_')
+  $s = $s.Trim('_')
+  if ($s.Length -gt 48) { $s = $s.Substring(0, 48).TrimEnd('_') }
+  if ([string]::IsNullOrWhiteSpace($s)) { return 'DESCONHECIDO' }
+  return $s
+}
+
+function Get-ServidorIdEstavel {
+  param([string]$HostName, [string[]]$Ips = @(), [string]$Mac = '')
+  $h = Get-SafeId $HostName
+  $isIp = ($HostName -match '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$') -or ($HostName -match ':')
+  # Named host: stable id is the hostname only (avoids IP/MAC forks of the same server).
+  if (-not $isIp) { return $h }
+  $ipsOk = @($Ips | Where-Object { $_ -and -not (Test-IpRuidoRede $_) } | Select-Object -Unique | Select-Object -First 3)
+  if ($ipsOk.Count -eq 0) { $ipsOk = @($HostName) }
+  $ipPart = (Get-SafeId (($ipsOk -join '-') -replace ':',''))
+  $macPart = ''
+  if ($Mac) {
+    $macPart = ($Mac -replace '[^A-Fa-f0-9]', '').ToUpperInvariant()
+    if ($macPart -eq '000000000000' -or $macPart -eq 'FFFFFFFFFFFF' -or $macPart.StartsWith('01005E')) { $macPart = '' }
+    elseif ($macPart.Length -gt 12) { $macPart = $macPart.Substring(0,12) }
+  }
+  $id = $ipPart
+  if ($macPart) { $id = $id + '__' + $macPart }
+  return $id
+}
+
+function Add-ServidorDescoberto {
+  param([string]$HostName, [string]$Caminho = '', [string]$Fonte, [string]$Ip = '', [string]$Mac = '', [string]$Obs = '')
+  if ([string]::IsNullOrWhiteSpace($HostName) -and $Caminho -match '^\\\\([^\\]+)\\') { $HostName = $Matches[1] }
+  if ([string]::IsNullOrWhiteSpace($HostName) -and $Ip) { $HostName = $Ip }
+  if ([string]::IsNullOrWhiteSpace($HostName)) { return $null }
+  # skip obvious local-only loopback labels unless UNC to self is useful as discovery of shares
+  $hn = $HostName.Trim().TrimStart('\\')
+  if ($hn -match '^(localhost|127\.0\.0\.1|::1)$') { return $null }
+  $ips = New-Object System.Collections.ArrayList
+  if ($Ip) { [void]$ips.Add($Ip) }
+  $id = Get-ServidorIdEstavel -HostName $hn -Ips @($ips) -Mac $Mac
+  $rec = [pscustomobject]@{
+    ServidorId = $id; Hostname = $hn; IP = $Ip; MAC = $Mac; Caminho = $Caminho; Fonte = $Fonte; Observacao = $Obs
+  }
+  [void]$script:ServidoresDescobertos.Add($rec)
+  return $rec
+}
+
+function Add-AcessoPcServidor {
+  param([string]$ServidorId, [string]$Hostname, [string]$Caminho, [string]$Fonte, [string]$Status = 'DETECTADO', [string]$ColetaOrigem = '', [string]$Obs = '')
+  [void]$script:AcessoPcServidor.Add([pscustomobject]@{
+    Equip = $Equip; HostLocal = $env:COMPUTERNAME; ServidorId = $ServidorId; HostnameServidor = $Hostname
+    Caminho = $Caminho; FonteEvidencia = $Fonte; Status = $Status; ColetaOndeEscaneado = $ColetaOrigem; Observacao = $Obs
+  })
+}
+
+function Get-ServidoresJaEscaneados {
+  # Look in Destino (pendrive coleta root) for prior SRV_* folders and servidores_escaneados.csv
+  $map = @{}
+  if ([string]::IsNullOrWhiteSpace($Destino) -or -not (Test-Path -LiteralPath $Destino)) { return $map }
+  try {
+    foreach ($dir in [System.IO.Directory]::EnumerateDirectories($Destino, 'EQ*_*-*', [System.IO.SearchOption]::TopDirectoryOnly)) {
+      $srvRoot = Join-Path $dir 'SRV'
+      # also SRV_* directly under collection
+      try {
+        foreach ($srv in [System.IO.Directory]::EnumerateDirectories($dir, 'SRV_*', [System.IO.SearchOption]::TopDirectoryOnly)) {
+          $leaf = Split-Path $srv -Leaf
+          $sid = $leaf.Substring(4)
+          $pastaColeta = Split-Path $dir -Leaf
+          if (-not $map.ContainsKey($sid)) {
+            $map[$sid] = [pscustomobject]@{ ServidorId = $sid; PastaColeta = $pastaColeta; CaminhoSRV = $srv }
+          }
+        }
+      } catch { }
+      $csvEsc = Join-Path $dir 'servidores_escaneados.csv'
+      if (Test-Path -LiteralPath $csvEsc) {
+        try {
+          $rows = Import-Csv -LiteralPath $csvEsc -Delimiter ';' -ErrorAction SilentlyContinue
+          foreach ($r in @($rows)) {
+            $sid = [string]$r.ServidorId
+            if ([string]::IsNullOrWhiteSpace($sid) -or $sid -eq 'Info') { continue }
+            $st = [string]$r.Status
+            if ($st -match 'PULADO|JA_ESCANEADO') { continue }
+            if ($st -match 'ESCANEADO|OK|PARCIAL|TEMPO') {
+              if (-not $map.ContainsKey($sid)) {
+                $map[$sid] = [pscustomobject]@{ ServidorId = $sid; PastaColeta = (Split-Path $dir -Leaf); CaminhoSRV = (Join-Path $dir ('SRV_' + $sid)) }
+              }
+            }
+          }
+        } catch { }
+      }
+    }
+  } catch { Write-Registro ("  dedup servidores: {0}" -f $_.Exception.Message) 'AVISO' }
+  # also INDICE_SERVIDORES.txt
+  $idxS = Join-Path $Destino 'INDICE_SERVIDORES.txt'
+  if (Test-Path -LiteralPath $idxS) {
+    try {
+      foreach ($line in [System.IO.File]::ReadAllLines($idxS)) {
+        if ($line -match 'SRV_([A-Z0-9._-]+)') {
+          $sid = $Matches[1]
+          if (-not $map.ContainsKey($sid)) {
+            $pasta = ''
+            if ($line -match 'escaneado_em=([^\s|]+)') { $pasta = $Matches[1] }
+            $map[$sid] = [pscustomobject]@{ ServidorId = $sid; PastaColeta = $pasta; CaminhoSRV = '' }
+          }
+        }
+      }
+    } catch { }
+  }
+  return $map
+}
+
+function Read-CabecalhoFormatoBarato {
+  param([string]$Caminho, [string]$Ext)
+  # Read-only first bytes; never modifies. Returns short version hint or ''.
+  $ext = $Ext.ToLowerInvariant()
+  if ($ext -notmatch '\.(dwg|dxf|rvt|rfa|rte|ipt|iam|idw|max|pdf)$') { return '' }
+  try {
+    $fs = [System.IO.File]::Open($Caminho, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+    try {
+      $buf = New-Object byte[] 64
+      $n = $fs.Read($buf, 0, 64)
+      if ($n -lt 6) { return '' }
+      if ($ext -eq '.dwg' -or $ext -eq '.dxf') {
+        $sig = [System.Text.Encoding]::ASCII.GetString($buf, 0, [math]::Min(6, $n))
+        # AC1015=2000, AC1018=2004, AC1021=2007, AC1024=2010, AC1027=2013, AC1032=2018
+        $map = @{ AC1015='AutoCAD_2000'; AC1018='AutoCAD_2004'; AC1021='AutoCAD_2007'; AC1024='AutoCAD_2010'; AC1027='AutoCAD_2013'; AC1032='AutoCAD_2018'; AC1035='AutoCAD_2020' }
+        if ($map.ContainsKey($sig)) { return $map[$sig] }
+        if ($sig -match '^AC\d{4}$') { return ('DWG_' + $sig) }
+        if ($ext -eq '.dxf' -and $sig.StartsWith('0')) { return 'DXF_texto' }
+      }
+      if ($ext -eq '.pdf') {
+        $sig = [System.Text.Encoding]::ASCII.GetString($buf, 0, [math]::Min(8, $n))
+        if ($sig.StartsWith('%PDF-')) { return $sig.Trim() }
+      }
+      # OLE compound (rvt/ipt/iam often): just mark OLE; full Revit version needs deeper parse (skip if slow)
+      if ($n -ge 8 -and $buf[0] -eq 0xD0 -and $buf[1] -eq 0xCF -and $buf[2] -eq 0x11 -and $buf[3] -eq 0xE0) {
+        return 'OLE_compound'
+      }
+    } finally { $fs.Close() }
+  } catch { return '' }
+  return ''
+}
+
+function Invoke-InventarioFormatos {
+  param(
+    [string]$Raiz,
+    [string]$RotuloEscopo,  # LOCAL:C\  or  SRV:id\share
+    [int]$ProfMax,
+    [int]$Segundos,
+    [switch]$LerCabecalho
+  )
+  $st = [ordered]@{ Escopo = $RotuloEscopo; Raiz = $Raiz; Status = 'COMPLETO'; Pastas = 0; Arquivos = 0; Formatados = 0; Segundos = 0 }
+  if ([string]::IsNullOrEmpty($Raiz) -or -not [System.IO.Directory]::Exists($Raiz)) {
+    $st.Status = 'INEXISTENTE_OU_NEGADO'
+    [void]$script:FormatosStatus.Add([pscustomobject]$st)
+    return
+  }
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
+  $pilha = New-Object 'System.Collections.Generic.Stack[object]'
+  $pilha.Push(@($Raiz, 0))
+  $vis = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+  $flagDir = [System.IO.FileAttributes]::Directory
+  $flagRep = [System.IO.FileAttributes]::ReparsePoint
+  $extSet = $script:ExtensoesFormatoSet
+  while ($pilha.Count -gt 0) {
+    if ($sw.Elapsed.TotalSeconds -ge $Segundos) { $st.Status = 'TEMPO_ESGOTADO'; break }
+    if ($script:FormatosArquivos.Count -ge $script:MaxFormatosArquivos) { $st.Status = 'LIMITE_ACHADOS'; break }
+    $it = $pilha.Pop(); $dir = [string]$it[0]; $prof = [int]$it[1]
+    if (-not $vis.Add($dir)) { continue }
+    $st.Pastas++
+    try {
+      $di = New-Object System.IO.DirectoryInfo $dir
+      foreach ($e in $di.EnumerateFileSystemInfos()) {
+        try {
+          $attr = $e.Attributes
+          if (($attr -band $flagDir) -ne 0) {
+            if (($attr -band $flagRep) -ne 0) { continue }
+            if ($prof -lt $ProfMax) { $pilha.Push(@($e.FullName, ($prof + 1))) }
+            continue
+          }
+          $st.Arquivos++
+          $ext = $e.Extension
+          if (-not $extSet.Contains($ext)) { continue }
+          $st.Formatados++
+          $ver = ''
+          if ($LerCabecalho) { $ver = Read-CabecalhoFormatoBarato -Caminho $e.FullName -Ext $ext }
+          [void]$script:FormatosArquivos.Add([pscustomobject]@{
+            Escopo = $RotuloEscopo; Caminho = $e.FullName; Nome = $e.Name; Extensao = $ext.ToLowerInvariant()
+            TamanhoBytes = [long]$e.Length
+            Criado = (Format-Data $e.CreationTime); Modificado = (Format-Data $e.LastWriteTime); Acessado = (Format-Data $e.LastAccessTime)
+            CriadoUTC = (Format-DataUtc $e.CreationTime); ModificadoUTC = (Format-DataUtc $e.LastWriteTime)
+            VersaoCabecalho = $ver
+          })
+        } catch { }
+      }
+    } catch [System.UnauthorizedAccessException] { }
+      catch { }
+  }
+  $sw.Stop()
+  $st.Segundos = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+  [void]$script:FormatosStatus.Add([pscustomobject]$st)
+  Write-Registro ("  formatos {0}: {1} ({2} formatados / {3} arquivos, {4}s)" -f $RotuloEscopo, $st.Status, $st.Formatados, $st.Arquivos, $st.Segundos)
+}
+
+function Save-ResumoFormatos {
+  $grupos = @($script:FormatosArquivos | Group-Object Escopo, Extensao)
+  $out = New-Object System.Collections.ArrayList
+  foreach ($g in $grupos) {
+    $parts = [string]$g.Name -split ',\s*'
+    $esc = $parts[0]; $ext = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+    $tam = ($g.Group | Measure-Object TamanhoBytes -Sum).Sum
+    $mods = @($g.Group | ForEach-Object { $_.Modificado } | Where-Object { $_ } | Sort-Object)
+    $cri = @($g.Group | ForEach-Object { $_.Criado } | Where-Object { $_ } | Sort-Object)
+    [void]$out.Add([pscustomobject]@{
+      Escopo = $esc; Extensao = $ext; Quantidade = $g.Count; TamanhoTotalBytes = $tam
+      TamanhoTotalMB = [math]::Round(($tam / 1MB), 2)
+      ModificadoMaisAntigo = $(if ($mods.Count) { $mods[0] } else { '' })
+      ModificadoMaisNovo = $(if ($mods.Count) { $mods[$mods.Count-1] } else { '' })
+      CriadoMaisAntigo = $(if ($cri.Count) { $cri[0] } else { '' })
+      CriadoMaisNovo = $(if ($cri.Count) { $cri[$cri.Count-1] } else { '' })
+    })
+  }
+  Save-Csv 'formatos_resumo.csv' $out 'Contagem e min/max de datas por escopo e extensao (metadados; sem cronologia mensal)'
+  Save-Csv 'formatos_arquivos.csv' $script:FormatosArquivos 'Metadados por arquivo de projeto/desenho (sem hash padrao; VersaoCabecalho se barato)'
+  Save-Csv 'formatos_status_varredura.csv' $script:FormatosStatus 'Cobertura da varredura de formatos por escopo'
+}
+
+function Get-UncHost([string]$Path) {
+  if ($Path -match '^\\\\([^\\]+)\\') { return $Matches[1] }
+  return ''
+}
+
+function Invoke-DescobertaRede {
+  Write-Registro '  descoberta de servidores (somente leitura)...'
+  # 1) mapped drives / SMB
+  try {
+    Get-SmbMapping -ErrorAction SilentlyContinue | ForEach-Object {
+      $r = [string]$_.RemotePath
+      $h = Get-UncHost $r
+      $rec = Add-ServidorDescoberto -HostName $h -Caminho $r -Fonte 'SmbMapping' -Obs ([string]$_.Status)
+      if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho $r -Fonte 'SmbMapping' }
+    }
+  } catch { }
+  try {
+    Get-SmbConnection -ErrorAction SilentlyContinue | ForEach-Object {
+      $srv = [string]$_.ServerName
+      $share = [string]$_.ShareName
+      $unc = if ($share) { '\\' + $srv + '\' + $share } else { '\\' + $srv }
+      $rec = Add-ServidorDescoberto -HostName $srv -Caminho $unc -Fonte 'SmbConnection'
+      if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $srv -Caminho $unc -Fonte 'SmbConnection' }
+    }
+  } catch { }
+  try {
+    $netUse = & "$env:SystemRoot\System32\net.exe" use 2>$null
+    foreach ($line in $netUse) {
+      if ($line -match '\\\\([^\\\s]+)\\(\S+)') {
+        $h = $Matches[1]; $unc = '\\' + $Matches[1] + '\' + $Matches[2]
+        $rec = Add-ServidorDescoberto -HostName $h -Caminho $unc -Fonte 'net_use'
+        if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho $unc -Fonte 'net_use' }
+      }
+    }
+  } catch { }
+
+  # 2) registry Network / MountPoints2 / TypedPaths / RunMRU (HKCU + loaded hives if any)
+  $rxUnc = New-Object System.Text.RegularExpressions.Regex('\\\\([^\\]+)\\([^\x00]*)', $rxOpt)
+  function Hunt-RegUnc([Microsoft.Win32.RegistryKey]$Base, [string]$Sub, [string]$FonteTag) {
+    if ($null -eq $Base) { return }
+    try {
+      $k = $Base.OpenSubKey($Sub)
+      if ($null -eq $k) { return }
+      foreach ($vn in $k.GetValueNames()) {
+        $val = [string]$k.GetValue($vn)
+        $blob = $vn + ' ' + $val
+        foreach ($m in $rxUnc.Matches($blob)) {
+          $h = $m.Groups[1].Value
+          $unc = '\\' + $h + '\' + $m.Groups[2].Value.TrimEnd('\')
+          $rec = Add-ServidorDescoberto -HostName $h -Caminho $unc -Fonte $FonteTag
+          if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho $unc -Fonte $FonteTag }
+        }
+      }
+      foreach ($sk in $k.GetSubKeyNames()) {
+        if ($sk -match '^##') {
+          # MountPoints2 encoded UNC
+          $dec = $sk -replace '#', '\'
+          if ($dec -match '\\\\([^\\]+)\\') {
+            $h = $Matches[1]
+            $rec = Add-ServidorDescoberto -HostName $h -Caminho $dec -Fonte ($FonteTag + ':MountPoints2')
+            if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho $dec -Fonte ($FonteTag + ':MountPoints2') }
+          }
+        }
+        foreach ($m in $rxUnc.Matches($sk)) {
+          $h = $m.Groups[1].Value
+          $rec = Add-ServidorDescoberto -HostName $h -Caminho ('\\' + $h + '\' + $m.Groups[2].Value) -Fonte $FonteTag
+          if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho ('\\' + $h) -Fonte $FonteTag }
+        }
+      }
+      $k.Close()
+    } catch { }
+  }
+  try {
+    $hkcu = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryView]::Default)
+    Hunt-RegUnc $hkcu 'Network' 'HKCU:Network'
+    Hunt-RegUnc $hkcu 'Software\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2' 'HKCU:MountPoints2'
+    Hunt-RegUnc $hkcu 'Software\Microsoft\Windows\CurrentVersion\Explorer\RecentDocs' 'HKCU:RecentDocs'
+    Hunt-RegUnc $hkcu 'Software\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths' 'HKCU:TypedPaths'
+    Hunt-RegUnc $hkcu 'Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU' 'HKCU:RunMRU'
+    Hunt-RegUnc $hkcu 'Software\Microsoft\Windows\CurrentVersion\Explorer\Map Network Drive MRU' 'HKCU:MapNetworkDriveMRU'
+  } catch { }
+
+  # 3) Recent .lnk targets (quick pass profiles)
+  try {
+    $sh = $null
+    try { $sh = New-Object -ComObject WScript.Shell } catch { }
+    if ($sh) {
+      foreach ($up in @($script:Perfis)) {
+        if (Test-PerfilEspecial $up.Usuario) { continue }
+        $recDir = Join-Path $up.Caminho 'AppData\Roaming\Microsoft\Windows\Recent'
+        if (-not [System.IO.Directory]::Exists($recDir)) { continue }
+        $di = New-Object System.IO.DirectoryInfo $recDir
+        $n = 0
+        foreach ($f in $di.EnumerateFiles('*.lnk')) {
+          if ($n -gt 400) { break }
+          $n++
+          try {
+            $alvo = $sh.CreateShortcut($f.FullName).TargetPath
+            if ($alvo -and $alvo.StartsWith('\\')) {
+              $h = Get-UncHost $alvo
+              $rec = Add-ServidorDescoberto -HostName $h -Caminho $alvo -Fonte 'Recent.lnk'
+              if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho $alvo -Fonte 'Recent.lnk' }
+            }
+          } catch { }
+        }
+      }
+    }
+  } catch { }
+
+  # 4) license servers port@host
+  foreach ($vn in @('LM_LICENSE_FILE','ADSKFLEX_LICENSE_FILE','FLEXLM_LICENSE_FILE')) {
+    foreach ($scope in @('Process','Machine','User')) {
+      $val = [string][Environment]::GetEnvironmentVariable($vn, $scope)
+      if (-not $val) { continue }
+      foreach ($piece in ($val -split ';')) {
+        if ($piece -match '^(\d+)@([A-Za-z0-9._-]+)$') {
+          $h = $Matches[2]; $port = $Matches[1]
+          $rec = Add-ServidorDescoberto -HostName $h -Caminho ('port@' + $port) -Fonte ('licenca:' + $vn) -Obs ('porta=' + $port)
+          if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho ('port@' + $h + ':' + $port) -Fonte ('licenca:' + $vn) }
+        }
+      }
+    }
+  }
+
+  # 5) ARP / neighbor
+  try {
+    Get-NetNeighbor -ErrorAction SilentlyContinue | Where-Object { $_.State -match 'Reachable|Permanent|Stale' } | ForEach-Object {
+      $ip = [string]$_.IPAddress
+      $mac = [string]$_.LinkLayerAddress
+      if (Test-IpRuidoRede $ip) { return }
+      if ($mac -match '(?i)^01-00-5[Ee]' -or $mac -match '(?i)^01005[Ee]' -or $mac -eq 'FF-FF-FF-FF-FF-FF' -or $mac -eq '00-00-00-00-00-00') { return }
+      $rec = Add-ServidorDescoberto -HostName $ip -Ip $ip -Mac $mac -Fonte 'NetNeighbor' -Caminho ''
+      if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $ip -Caminho $ip -Fonte 'NetNeighbor' }
+    }
+  } catch {
+    try {
+      $arp = & "$env:SystemRoot\System32\arp.exe" -a 2>$null
+      foreach ($line in $arp) {
+        if ($line -match '^\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\s+([0-9a-fA-F\-:]{11,17})\s+') {
+          $ip = $Matches[1]; $mac = $Matches[2]
+          if ($ip -match '^(224\.|239\.|255\.|127\.)') { continue }
+          $rec = Add-ServidorDescoberto -HostName $ip -Ip $ip -Mac $mac -Fonte 'arp'
+          if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $ip -Caminho $ip -Fonte 'arp' }
+        }
+      }
+    } catch { }
+  }
+
+  # 6) DNS cache
+  try {
+    Get-DnsClientCache -ErrorAction SilentlyContinue | Where-Object { $_.Type -eq 'A' -or $_.Type -eq 1 } | Select-Object -First 200 | ForEach-Object {
+      $h = [string]$_.Entry
+      $ip = [string]$_.Data
+      if ($h -match '\.(local|lan|corp|internal)$' -or $h -match '^(fileserv|srv|server|nas|dc|fs)') {
+        $rec = Add-ServidorDescoberto -HostName $h -Ip $ip -Fonte 'DnsCache'
+        if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $h -Caminho $h -Fonte 'DnsCache' }
+      }
+    }
+  } catch { }
+
+  # 7) established TCP remote endpoints (high ports ignored noise; keep common file/license ports)
+  try {
+    Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | Select-Object -First 300 | ForEach-Object {
+      $rip = [string]$_.RemoteAddress
+      $rp = [int]$_.RemotePort
+      if ($rip -match '^(127\.|::1|0\.0\.0\.0)$') { return }
+      if ($rp -in @(445,139,2049,27000,27001,27002,27003,2080,22,3389,5985,5986) -or ($rp -ge 27000 -and $rp -le 27009)) {
+        $rec = Add-ServidorDescoberto -HostName $rip -Ip $rip -Fonte 'TCP' -Obs ('porta=' + $rp)
+        if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $rip -Caminho ($rip + ':' + $rp) -Fonte 'TCP' }
+      }
+    }
+  } catch { }
+
+  # 8) domain / DC
+  try {
+    $cs = Get-CimInstance Win32_ComputerSystem -OperationTimeoutSec 30
+    if ($cs.PartOfDomain) {
+      $dom = [string]$cs.Domain
+      $rec = Add-ServidorDescoberto -HostName $dom -Fonte 'Domain' -Obs 'dominio'
+      if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $dom -Caminho $dom -Fonte 'Domain' }
+      try {
+        $nl = & "$env:SystemRoot\System32\nltest.exe" /dsgetdc:$dom 2>$null
+        foreach ($line in $nl) {
+          if ($line -match 'DC:\s*\\\\(\S+)') {
+            $dc = $Matches[1]
+            $rec = Add-ServidorDescoberto -HostName $dc -Fonte 'nltest_DC'
+            if ($rec) { Add-AcessoPcServidor -ServidorId $rec.ServidorId -Hostname $dc -Caminho ('\\' + $dc) -Fonte 'nltest_DC' }
+          }
+        }
+      } catch { }
+    }
+  } catch { }
+
+  Write-Registro ("  servidores brutos descobertos: {0}; acessos registrados: {1}" -f $script:ServidoresDescobertos.Count, $script:AcessoPcServidor.Count)
+}
+
+
+function Test-IpRuidoRede([string]$Ip) {
+  if ([string]::IsNullOrWhiteSpace($Ip)) { return $true }
+  $ip = $Ip.Trim()
+  if ($ip -match '^(0\.0\.0\.0|127\.|224\.|225\.|226\.|227\.|228\.|229\.|230\.|231\.|232\.|233\.|234\.|235\.|236\.|237\.|238\.|239\.|255\.)') { return $true }
+  if ($ip -match '^169\.254\.') { return $true }
+  if ($ip -match '(?i)^ff') { return $true } # IPv6 multicast
+  if ($ip -match '(?i)^fe80:') { return $true } # link-local
+  if ($ip -eq '::1') { return $true }
+  return $false
+}
+
+function Test-DeveEscanearServidor {
+  param([System.Collections.ArrayList]$Fontes)
+  $scanFonts = 'SmbMapping|SmbConnection|net_use|HKCU:|Recent\.lnk|licenca:|nltest_DC|Domain|TypedPaths|MountPoints|MapNetwork'
+  foreach ($f in @($Fontes)) {
+    if ([string]$f -match $scanFonts) { return $true }
+  }
+  return $false
+}
+
+function Test-HostEhLocal([string]$HostName) {
+  if ([string]::IsNullOrWhiteSpace($HostName)) { return $true }
+  $h = $HostName.Trim().TrimStart('\\')
+  if ($h -eq '.' -or $h -eq 'localhost' -or $h -eq '127.0.0.1') { return $true }
+  if ($h -ieq $env:COMPUTERNAME) { return $true }
+  try {
+    $fqdn = [System.Net.Dns]::GetHostEntry('localhost').HostName
+    if ($h -ieq $fqdn) { return $true }
+    if ($fqdn -and $h -ieq ($fqdn.Split('.')[0])) { return $true }
+  } catch { }
+  return $false
+}
+
+function Get-SharesVisiveis([string]$HostName) {
+  $shares = New-Object System.Collections.ArrayList
+  $uncRoot = '\\' + $HostName
+  try {
+    $out = & "$env:SystemRoot\System32\net.exe" view $uncRoot 2>$null
+    foreach ($line in $out) {
+      if ($line -match '^([A-Za-z0-9\$_.-]+)\s') {
+        $name = $Matches[1]
+        if ($name -match '^(The|Command|Shared|---|\*)') { continue }
+        [void]$shares.Add($name)
+      }
+    }
+  } catch { }
+  # common fallbacks
+  if ($shares.Count -eq 0) {
+    foreach ($guess in @('Data','data','share','Share','public','Public','CAD','cad','projetos','Projetos','users','Users')) {
+      $p = Join-Path $uncRoot $guess
+      if ([System.IO.Directory]::Exists($p)) { [void]$shares.Add($guess) }
+    }
+  }
+  return ,@($shares | Select-Object -Unique)
+}
+
+function Invoke-EscaneamentoServidor {
+  param(
+    [string]$ServidorId,
+    [string]$HostName,
+    [System.Collections.ArrayList]$CaminhosConhecidos,
+    [int]$Segundos,
+    [int]$ProfMax
+  )
+  $dirSrv = Join-Path $script:Out ('SRV_' + $ServidorId)
+  try { [void][System.IO.Directory]::CreateDirectory($dirSrv) } catch {
+    Write-Registro ("  nao criou pasta SRV: {0}" -f $_.Exception.Message) 'AVISO'
+    return [pscustomobject]@{ ServidorId = $ServidorId; Hostname = $HostName; Status = 'ERRO_PASTA'; Shares = ''; PastaSRV = ''; Segundos = 0; Observacao = $_.Exception.Message }
+  }
+  $sw = [System.Diagnostics.Stopwatch]::StartNew()
+  $shares = Get-SharesVisiveis -HostName $HostName
+  # also include share from known UNC paths
+  foreach ($c in @($CaminhosConhecidos)) {
+    if ($c -match '^\\\\[^\\]+\\([^\\]+)') {
+      $sn = $Matches[1]
+      if ($shares -notcontains $sn) { $shares = @($shares + $sn) }
+    }
+  }
+  $shareList = ($shares -join ';')
+  [System.IO.File]::WriteAllText((Join-Path $dirSrv 'shares.txt'), (($shares | ForEach-Object { $_ }) -join "`r`n") + "`r`n", $script:Utf8Bom)
+
+  $achadosSrv = New-Object System.Collections.ArrayList
+  $status = 'ESCANEADO'
+  $nShareOk = 0
+  foreach ($sh in $shares) {
+    if ($sw.Elapsed.TotalSeconds -ge $Segundos) { $status = 'TEMPO_ESGOTADO'; break }
+    $unc = '\\' + $HostName + '\' + $sh
+    $restante = [math]::Max(5, $Segundos - [int]$sw.Elapsed.TotalSeconds)
+    Write-Registro ("  escaneando share {0} (limite {1}s)..." -f $unc, $restante)
+    # listability check
+    if (-not [System.IO.Directory]::Exists($unc)) {
+      [void]$achadosSrv.Add([pscustomobject]@{ Share = $sh; Status = 'INACESSIVEL'; Observacao = 'Directory.Exists=false' })
+      continue
+    }
+    $nShareOk++
+    # software/crack heuristics via Invoke-Varredura in fabricante+projeto modes limited
+    $rot = ('SRV:' + $ServidorId + '\' + $sh)
+    try {
+      Invoke-Varredura -Raiz $unc -Modo 'projeto' -ProfMax $ProfMax -Segundos ([math]::Min(45, $restante)) -Rotulo $rot
+    } catch { Write-Registro ("  varredura share falhou: {0}" -f $_.Exception.Message) 'AVISO' }
+    $restante2 = [math]::Max(5, $Segundos - [int]$sw.Elapsed.TotalSeconds)
+    try {
+      Invoke-InventarioFormatos -Raiz $unc -RotuloEscopo $rot -ProfMax $ProfMax -Segundos ([math]::Min(40, $restante2)) -LerCabecalho:($script:LerCabecalhoFormatos)
+    } catch { }
+    # remote uninstall (read-only) if remote registry allows - best effort, no service start
+    try {
+      $rk = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $HostName)
+      if ($rk) {
+        $un = $rk.OpenSubKey('SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall')
+        $linU = New-Object System.Collections.ArrayList
+        if ($un) {
+          $i = 0
+          foreach ($sub in $un.GetSubKeyNames()) {
+            if ($i -gt 800) { break }
+            $i++
+            try {
+              $sk = $un.OpenSubKey($sub)
+              if ($null -eq $sk) { continue }
+              $dn = [string]$sk.GetValue('DisplayName')
+              if ([string]::IsNullOrWhiteSpace($dn)) { $sk.Close(); continue }
+              if ($script:RxFab.IsMatch($dn) -or $script:RxForte.IsMatch($dn)) {
+                [void]$linU.Add([pscustomobject]@{ DisplayName = $dn; DisplayVersion = [string]$sk.GetValue('DisplayVersion'); Publisher = [string]$sk.GetValue('Publisher'); InstallLocation = [string]$sk.GetValue('InstallLocation'); Key = $sub })
+              }
+              $sk.Close()
+            } catch { }
+          }
+          $un.Close()
+        }
+        $rk.Close()
+        if ($linU.Count -gt 0) {
+          $pUn = Join-Path $dirSrv 'software_remoto_uninstall.csv'
+          $linU | Export-Csv -LiteralPath $pUn -NoTypeInformation -Encoding UTF8 -Delimiter ';'
+        }
+      }
+    } catch {
+      [System.IO.File]::AppendAllText((Join-Path $dirSrv 'software_remoto_nota.txt'), ('OpenRemoteBaseKey indisponivel: ' + $_.Exception.Message + "`r`n"), $script:Utf8Bom)
+    }
+    [void]$achadosSrv.Add([pscustomobject]@{ Share = $sh; Status = 'OK'; Observacao = '' })
+  }
+  $sw.Stop()
+  if ($nShareOk -eq 0 -and $shares.Count -gt 0) { $status = 'SHARES_INACESSIVEIS' }
+  elseif ($nShareOk -eq 0) { $status = 'SEM_SHARES' }
+  elseif ($status -eq 'ESCANEADO' -and $sw.Elapsed.TotalSeconds -ge ($Segundos - 1)) { $status = 'PARCIAL_TEMPO' }
+
+  $pShCsv = Join-Path $dirSrv 'shares_status.csv'
+  if ($achadosSrv.Count -gt 0) { $achadosSrv | Export-Csv -LiteralPath $pShCsv -NoTypeInformation -Encoding UTF8 -Delimiter ';' }
+  else { [System.IO.File]::WriteAllText($pShCsv, "`"Info`"`r`n`"sem shares`"`r`n", $script:Utf8Bom) }
+
+  # append INDICE_SERVIDORES
+  try {
+    $linha = ('{0} | SRV_{1} | host={2} | escaneado_em={3} | status={4} | shares={5}' -f (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'), $ServidorId, $HostName, (Split-Path $script:Out -Leaf), $status, $shareList)
+    [System.IO.File]::AppendAllText((Join-Path $Destino 'INDICE_SERVIDORES.txt'), $linha + "`r`n", $script:Utf8Bom)
+  } catch { }
+
+  return [pscustomobject]@{
+    ServidorId = $ServidorId; Hostname = $HostName; Status = $status; Shares = $shareList
+    PastaSRV = ('SRV_' + $ServidorId); Segundos = [math]::Round($sw.Elapsed.TotalSeconds, 1); Observacao = ('shares_ok=' + $nShareOk)
+  }
+}
+# === END v1.4.8 NETWORK + FORMATOS ===
+
+
 # =============================================================================================
 # v1.4.7: se abortar no meio, ainda assim tenta manifesto + INDICE + unload
 # =============================================================================================
@@ -1450,6 +2073,110 @@ Invoke-Secao 'Arquivos recentes (Recent .lnk e Jump Lists)' {
 # =============================================================================================
 # v1.4: carrega hives de usuarios deslogados a partir de COPIA no pendrive (somente leitura no original)
 # =============================================================================================
+
+# =============================================================================================
+# v1.4.8: descoberta de rede + escaneamento de servidores (dedup) + inventario de formatos
+# =============================================================================================
+Invoke-Secao 'Rede e servidores (descoberta, dedup, scan somente leitura)' {
+  if ($SemRede) {
+    Write-Registro '  rede/servidores PULADO (-SemRede ou KIT_REDE=0)'
+    [void]$script:SecaoParcial.Add('pulado por parametro')
+    Save-Csv 'servidores_descobertos.csv' @() 'Pulado'
+    Save-Csv 'acesso_pc_servidor.csv' @() 'Pulado'
+    Save-Csv 'servidores_escaneados.csv' @() 'Pulado'
+    return
+  }
+  Invoke-DescobertaRede
+
+  # Deduplicate discovered hosts by ServidorId
+  $porId = @{}
+  foreach ($d in @($script:ServidoresDescobertos)) {
+    $sid = [string]$d.ServidorId
+    if (-not $porId.ContainsKey($sid)) {
+      $porId[$sid] = [pscustomobject]@{ ServidorId = $sid; Hostname = $d.Hostname; IPs = New-Object System.Collections.ArrayList; Fontes = New-Object System.Collections.ArrayList; Caminhos = New-Object System.Collections.ArrayList; MAC = $d.MAC }
+    }
+    $agg = $porId[$sid]
+    if ($d.IP -and ($agg.IPs -notcontains $d.IP)) { [void]$agg.IPs.Add($d.IP) }
+    if ($d.Fonte -and ($agg.Fontes -notcontains $d.Fonte)) { [void]$agg.Fontes.Add($d.Fonte) }
+    if ($d.Caminho -and ($agg.Caminhos -notcontains $d.Caminho)) { [void]$agg.Caminhos.Add($d.Caminho) }
+    if (-not $agg.MAC -and $d.MAC) { $agg.MAC = $d.MAC }
+  }
+
+  $ja = Get-ServidoresJaEscaneados
+  Write-Registro ("  servidores unicos: {0}; ja escaneados em coletas anteriores: {1}" -f $porId.Count, $ja.Count)
+
+  $swTotal = [System.Diagnostics.Stopwatch]::StartNew()
+  foreach ($sid in @($porId.Keys | Sort-Object)) {
+    $agg = $porId[$sid]
+    $hn = [string]$agg.Hostname
+    if (Test-HostEhLocal $hn) {
+      [void]$script:ServidoresEscaneados.Add([pscustomobject]@{ ServidorId = $sid; Hostname = $hn; Status = 'PULADO_HOST_LOCAL'; Shares = ''; PastaSRV = ''; Segundos = 0; Observacao = 'mesmo host da coleta; shares locais cobertos na varredura do EQ' })
+      Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho ('\\' + $hn) -Fonte 'local' -Status 'HOST_LOCAL_NAO_ESCANEADO_COMO_SRV' -Obs 'dedup local'
+      continue
+    }
+    if ($ja.ContainsKey($sid)) {
+      $prev = $ja[$sid]
+      $origem = [string]$prev.PastaColeta
+      [void]$script:ServidoresEscaneados.Add([pscustomobject]@{ ServidorId = $sid; Hostname = $hn; Status = 'JA_ESCANEADO_PULADO'; Shares = ''; PastaSRV = ''; Segundos = 0; Observacao = ('ver coleta ' + $origem) })
+      foreach ($c in @($agg.Caminhos)) {
+        Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho $c -Fonte 'dedup' -Status 'ACESSO_SO_DOCUMENTADO' -ColetaOrigem $origem -Obs 'servidor ja escaneado em coleta anterior'
+      }
+      if (@($agg.Caminhos).Count -eq 0) {
+        Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho ('\\' + $hn) -Fonte 'dedup' -Status 'ACESSO_SO_DOCUMENTADO' -ColetaOrigem $origem
+      }
+      Write-Registro ("  PULADO (ja escaneado em {0}): {1}" -f $origem, $sid)
+      continue
+    }
+    if (-not (Test-DeveEscanearServidor -Fontes $agg.Fontes)) {
+      [void]$script:ServidoresEscaneados.Add([pscustomobject]@{ ServidorId = $sid; Hostname = $hn; Status = 'PULADO_SO_VIZINHO'; Shares = ''; PastaSRV = ''; Segundos = 0; Observacao = ('fontes=' + ($agg.Fontes -join ',')) })
+      Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho ('\' + $hn) -Fonte 'vizinho' -Status 'DOCUMENTADO_SEM_SCAN' -Obs 'ARP/DNS/TCP sem evidencia de share/UNC/licenca'
+      continue
+    }
+    if ($swTotal.Elapsed.TotalSeconds -ge $SegundosTotalServidores) {
+      [void]$script:ServidoresEscaneados.Add([pscustomobject]@{ ServidorId = $sid; Hostname = $hn; Status = 'PULADO_TEMPO_TOTAL'; Shares = ''; PastaSRV = ''; Segundos = 0; Observacao = 'SegundosTotalServidores esgotado' })
+      Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho ('\' + $hn) -Fonte 'limite_tempo' -Status 'NAO_ESCANEADO_TEMPO' 
+      continue
+    }
+    $restTotal = [math]::Max(10, $SegundosTotalServidores - [int]$swTotal.Elapsed.TotalSeconds)
+    $limite = [math]::Min($SegundosPorServidor, $restTotal)
+    $caminhos = New-Object System.Collections.ArrayList
+    foreach ($c in @($agg.Caminhos)) { [void]$caminhos.Add($c) }
+    $res = Invoke-EscaneamentoServidor -ServidorId $sid -HostName $hn -CaminhosConhecidos $caminhos -Segundos $limite -ProfMax $ProfundidadeServidor
+    [void]$script:ServidoresEscaneados.Add($res)
+    foreach ($c in @($agg.Caminhos)) {
+      Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho $c -Fonte 'scan' -Status $res.Status -ColetaOrigem (Split-Path $script:Out -Leaf)
+    }
+    if (@($agg.Caminhos).Count -eq 0) {
+      Add-AcessoPcServidor -ServidorId $sid -Hostname $hn -Caminho ('\\' + $hn) -Fonte 'scan' -Status $res.Status -ColetaOrigem (Split-Path $script:Out -Leaf)
+    }
+  }
+
+  # Deduplicate acesso rows lightly
+  Save-Csv 'servidores_descobertos.csv' $script:ServidoresDescobertos 'Hosts/UNCs descobertos (SMB, registro, lnk, ARP, DNS, TCP, licenca, DC)'
+  Save-Csv 'acesso_pc_servidor.csv' $script:AcessoPcServidor 'Este EQ tem acesso ao servidor; se JA_ESCANEADO aponta coleta anterior'
+  Save-Csv 'servidores_escaneados.csv' $script:ServidoresEscaneados 'Resultado do scan (ou pulo por dedup/tempo/local)'
+}
+
+Invoke-Secao 'Inventario de formatos (discos locais, metadados)' {
+  # Local fixed/removable disks except the pendrive destino
+  $raizDest = [System.IO.Path]::GetPathRoot($script:Out)
+  $swL = [System.Diagnostics.Stopwatch]::StartNew()
+  foreach ($d in [System.IO.DriveInfo]::GetDrives()) {
+    if (-not $d.IsReady) { continue }
+    if ($d.DriveType -ne 'Fixed' -and $d.DriveType -ne 'Removable' -and $d.DriveType -ne 'Network') { continue }
+    $root = $d.Name
+    if ($raizDest -and ($root.TrimEnd('\') -ieq $raizDest.TrimEnd('\'))) { continue }
+    if ($swL.Elapsed.TotalSeconds -ge $SegundosFormatosLocal) {
+      Write-Registro '  formatos local: tempo total esgotado' 'AVISO'
+      break
+    }
+    $rest = [math]::Max(5, $SegundosFormatosLocal - [int]$swL.Elapsed.TotalSeconds)
+    $rot = ('LOCAL:' + $root.TrimEnd('\'))
+    Invoke-InventarioFormatos -Raiz $root -RotuloEscopo $rot -ProfMax $ProfundidadeFormatosLocal -Segundos ([math]::Min(40, $rest)) -LerCabecalho:($script:LerCabecalhoFormatos)
+  }
+  Save-ResumoFormatos
+}
+
 Invoke-Secao 'Hives offline (copia NTUSER.DAT no pendrive)' {
   if (-not $LerHivesOffline) {
     Write-Registro '  -LerHivesOffline desligado; pulando carga de hives deslogados'
